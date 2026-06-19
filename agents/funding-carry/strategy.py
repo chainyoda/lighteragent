@@ -16,7 +16,7 @@ from decimal import Decimal
 from itertools import combinations
 from typing import Iterable
 
-from eigenstrategies_sdk import MarketState, Order, Strategy, run_agent
+from eigenstrategies_sdk import Guardrails, MarketState, Order, Strategy, run_agent
 
 
 log = logging.getLogger("funding-carry")
@@ -89,4 +89,18 @@ def _flatten(state: MarketState, *markets: str) -> Iterable[Order]:
 
 
 if __name__ == "__main__":
-    run_agent(FundingCarry(), markets=MARKETS)
+    # The constants above are the strategy's own (attested) limits. The
+    # guardrails below are enforced by the runtime inside the TEE and back
+    # them up: even if decide() had a bug, no order can breach these.
+    run_agent(
+        FundingCarry(),
+        markets=MARKETS,
+        guardrails=Guardrails(
+            allowed_markets=frozenset(MARKETS),
+            max_leverage=Decimal("1"),               # delta-neutral: no leverage
+            max_notional_per_order=MAX_NOTIONAL_PER_PAIR,
+            max_notional_per_market=MAX_NOTIONAL_PER_PAIR * 2,
+            min_free_collateral=MIN_FREE_COLLATERAL,
+            max_drawdown_pct=Decimal("0.10"),
+        ),
+    )

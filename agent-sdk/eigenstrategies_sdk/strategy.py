@@ -30,6 +30,10 @@ class MarketState:
     mid_prices: dict[str, Decimal]
     funding_rates: dict[str, Decimal]
     open_orders: dict[str, list]
+    # Total account equity (collateral marked-to-market + unrealized PnL) for
+    # the vault's sub-account. Used by the runtime guardrails for leverage and
+    # drawdown checks; falls back to free_collateral when unavailable.
+    account_value: Decimal = Decimal(0)
 
 
 @dataclass(frozen=True)
