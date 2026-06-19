@@ -97,7 +97,7 @@ function openModal() {
 
   const footer = document.createElement("div");
   footer.style.cssText = "padding:0.875rem 1.5rem;border-top:1px solid oklch(var(--border));font-size:0.75rem;color:oklch(var(--muted-foreground));line-height:1.5;";
-  footer.innerHTML = `EigenVaults will request your address only. No transactions are signed in this prototype.`;
+  footer.innerHTML = `EigenStrategies will request your address only. No transactions are signed in this prototype.`;
   modal.appendChild(footer);
 
   overlay.appendChild(modal);

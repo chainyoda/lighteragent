@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>EigenVaults — agent-traded ERC-4626 on Lighter</title>
+<title>EigenStrategies — agent-traded ERC-4626 on Lighter</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -136,7 +136,7 @@ function Logo() {
         <path d="M16 8 L24 12 V20 L16 24 L8 20 V12 Z" fill="#818cf8" opacity="0.25" />
         <circle cx="16" cy="16" r="2.5" fill="#818cf8" />
       </svg>
-      <div className="font-semibold tracking-tight">EigenVaults</div>
+      <div className="font-semibold tracking-tight">EigenStrategies</div>
     </div>
   );
 }
@@ -650,7 +650,7 @@ function Portfolio({ account, setRoute }) {
 function Docs() {
   return (
     <div className="max-w-3xl mx-auto px-5 py-12 prose prose-invert">
-      <h1>How EigenVaults works</h1>
+      <h1>How EigenStrategies works</h1>
       <p>Three planes:</p>
       <ol>
         <li><b>Custody</b> — USDC sits in an ERC-4626 vault on L2. Investors mint and burn shares.</li>
@@ -675,7 +675,7 @@ function App() {
       {route.name === "docs" && <Docs />}
       <footer className="border-t border-white/5 mt-16">
         <div className="max-w-6xl mx-auto px-5 py-6 text-xs text-neutral-500 flex justify-between">
-          <div>EigenVaults · prototype · all data is mocked</div>
+          <div>EigenStrategies · prototype · all data is mocked</div>
           <a href="https://github.com/chainyoda/lighteragent" className="hover:text-neutral-300">GitHub →</a>
         </div>
       </footer>

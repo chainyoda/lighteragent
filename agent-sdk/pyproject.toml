@@ -1,7 +1,7 @@
 [project]
-name = "eigenvaults-sdk"
+name = "eigenstrategies-sdk"
 version = "0.1.0"
-description = "Python SDK for building EigenVaults trading agents that run on EigenCompute and trade on Lighter."
+description = "Python SDK for building EigenStrategies trading agents that run on EigenCompute and trade on Lighter."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -18,4 +18,4 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["eigenvaults_sdk*"]
+include = ["eigenstrategies_sdk*"]

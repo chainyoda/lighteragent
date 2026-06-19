@@ -284,7 +284,7 @@ async function createVault() {
     try {
       btn.textContent = "Awaiting wallet signature…";
       const message = [
-        "EigenVaults — Create Vault",
+        "EigenStrategies — Create Vault",
         "",
         `Name: ${name}`,
         `Image hash: ${imageHash}`,

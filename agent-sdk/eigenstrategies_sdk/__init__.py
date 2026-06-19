@@ -1,4 +1,4 @@
-"""EigenVaults agent SDK.
+"""EigenStrategies agent SDK.
 
 Build a trading agent by subclassing Strategy and calling run_agent().
 Everything else (TEE attestation, vault accrual, Lighter signing,

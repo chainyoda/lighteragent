@@ -1,18 +1,18 @@
-# eigenvaults-sdk
+# eigenstrategies-sdk
 
-Python SDK for building EigenVaults trading agents. Implement one method, ship.
+Python SDK for building EigenStrategies trading agents. Implement one method, ship.
 
 ## Install
 
 ```bash
-pip install eigenvaults-sdk
+pip install eigenstrategies-sdk
 ```
 
 ## Quickstart
 
 ```python
 from decimal import Decimal
-from eigenvaults_sdk import Strategy, MarketState, Order, run_agent
+from eigenstrategies_sdk import Strategy, MarketState, Order, run_agent
 
 class HelloStrategy(Strategy):
     tick_seconds = 30
@@ -61,5 +61,5 @@ charged onchain, and `on_fill` is invoked once each fill confirms.
 
 ## See also
 
-- [EigenVaults architecture](../README.md)
+- [EigenStrategies architecture](../README.md)
 - [Reference agent: funding-carry](../agents/funding-carry/)

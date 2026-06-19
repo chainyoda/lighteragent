@@ -1,1 +1,1 @@
-eigenvaults-sdk>=0.1.0
+eigenstrategies-sdk>=0.1.0

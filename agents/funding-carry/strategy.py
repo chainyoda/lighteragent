@@ -16,7 +16,7 @@ from decimal import Decimal
 from itertools import combinations
 from typing import Iterable
 
-from eigenvaults_sdk import MarketState, Order, Strategy, run_agent
+from eigenstrategies_sdk import MarketState, Order, Strategy, run_agent
 
 
 log = logging.getLogger("funding-carry")

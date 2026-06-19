@@ -1,4 +1,4 @@
-# EigenVaults
+# EigenStrategies
 
 A permissionless, attested agent-vault platform where anyone can build, deploy, and run a trading agent on EigenCloud. Investors deposit USDC into a per-agent ERC-4626 vault and are traded by the same algorithm under shared accounting. The vault builder earns configurable transaction-fee and performance-fee shares.
 
@@ -17,7 +17,7 @@ A permissionless, attested agent-vault platform where anyone can build, deploy, 
 
 ```python
 from decimal import Decimal
-from eigenvaults_sdk import Strategy, MarketState, Order, run_agent
+from eigenstrategies_sdk import Strategy, MarketState, Order, run_agent
 
 class MyStrategy(Strategy):
     tick_seconds = 30
@@ -45,9 +45,9 @@ Lighter Public Pools today are:
 - **Off-chain accounting** — shares live inside an operator sub-account, not as ERC-20s.
 - **Strategy-opaque** — depositors trust the operator, with no cryptographic guarantee that the running code matches what was advertised.
 
-EigenVaults closes all three gaps and turns each into an Eigen primitive:
+EigenStrategies closes all three gaps and turns each into an Eigen primitive:
 
-| Gap in Lighter Public Pools  | EigenVaults answer                                                                 |
+| Gap in Lighter Public Pools  | EigenStrategies answer                                                                 |
 | ---------------------------- | ---------------------------------------------------------------------------------- |
 | Permissioned operators       | Permissionless `VaultFactory` — anyone deploys a vault.                            |
 | Off-chain shares             | ERC-4626 share token, composable in DeFi.                                          |
@@ -295,7 +295,7 @@ sequenceDiagram
 
 1. **Attestation verifier path** — AVS-backed vs. fully onchain. Affects both gas and trust assumptions.
 2. **Fee cap policy** — confirmed as "no caps." Surface fees prominently in vault metadata so frontend can warn.
-3. **Lighter Public Pools coexistence** — should EigenVaults *also* register as Lighter Public Pools (if/when Lighter opens permissionless creation), or stay sub-account-only? Affects discoverability inside Lighter's UI.
+3. **Lighter Public Pools coexistence** — should EigenStrategies *also* register as Lighter Public Pools (if/when Lighter opens permissionless creation), or stay sub-account-only? Affects discoverability inside Lighter's UI.
 4. **NAV update cadence** — per-fill, per-block, or pull-only on deposit/redeem? Trade-off between gas and stale-NAV arbitrage windows.
 5. **Cross-vault rebalancing** — explicitly out of scope for v1; each vault is isolated.
 

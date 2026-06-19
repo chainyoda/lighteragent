@@ -28,7 +28,7 @@ from .strategy import Strategy
 from .vault_client import VaultClient, from_env as vault_from_env
 
 
-log = logging.getLogger("eigenvaults.runtime")
+log = logging.getLogger("eigenstrategies.runtime")
 
 
 async def _run(strategy: Strategy, markets: list[str]) -> None:
