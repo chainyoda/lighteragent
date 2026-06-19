@@ -133,6 +133,13 @@
         <span class="text-xs text-muted">Paper mode trades a simulated sub-account — no real capital at risk.</span>
       </div>
 
+      <label class="block mt-5">
+        <div class="mono text-xs uppercase tracking-wider text-muted mb-1.5">Agent name</div>
+        <input id="agent-name" maxlength="40" placeholder="e.g. Momentum Macro"
+               class="w-full md:w-96 border border-default rounded-md px-3 py-2.5 outline-none focus:border-[color:oklch(var(--foreground))]" />
+        <div class="text-xs text-muted mt-1.5">Shown to investors and used as the default vault name. You can change it when you list the vault.</div>
+      </label>
+
       <div class="mt-5 flex items-center gap-3 flex-wrap">
         <button id="backtest-btn" class="btn-primary px-5 py-2.5 rounded-md text-sm font-medium inline-flex items-center gap-2">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-7"/></svg>
@@ -229,6 +236,7 @@
         <div class="flex items-start justify-between gap-4 mb-3">
           <div>
             <div class="text-xs mono uppercase tracking-wider text-primary mb-1">Agent live on EigenCompute</div>
+            <div id="out-agent-name" class="display text-lg font-semibold"></div>
             <div class="text-sm text-muted">Trade your own funds via the TEE wallet, or list a vault to accept outside capital.</div>
           </div>
         </div>
@@ -311,6 +319,6 @@
 <script src="./data.js?v=7" defer></script>
 <script src="./ui.js?v=7" defer></script>
 <script src="./wallet.js?v=7" defer></script>
-<script src="./create.js?v=7" defer></script>
+<script src="./create.js?v=8" defer></script>
 </body>
 </html>
