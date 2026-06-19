@@ -112,10 +112,128 @@ function init() {
 
   document.getElementById("deploy-btn").addEventListener("click", deploy);
 
-  createBtn().addEventListener("click", () => {
-    if (createBtn().disabled) return;
-    alert("VaultFactory.createVault tx submitted (mock)");
-  });
+  createBtn().addEventListener("click", createVault);
+}
+
+async function createVault() {
+  const btn = createBtn();
+  if (btn.disabled) return;
+
+  const name = document.querySelector('input[placeholder="Momentum Macro"]')?.value?.trim() || "Untitled Vault";
+  const perfFee = document.querySelectorAll('input[type="number"]')[0]?.value || "2000";
+  const txFee = document.querySelectorAll('input[type="number"]')[1]?.value || "8";
+  const imageHash = document.getElementById("out-image-hash").textContent;
+  const teeWallet = document.getElementById("out-tee-wallet").textContent;
+
+  btn.disabled = true;
+  btn.classList.add("opacity-50");
+  btn.textContent = "Confirming…";
+
+  await appendLog("");
+  await appendLog("$ vaultfactory.createvault");
+  await appendLog(`  name: ${name}`);
+  await appendLog(`  imageHash: ${imageHash}`);
+  await appendLog(`  teeWallet: ${teeWallet}`);
+  await appendLog(`  perfFeeBps: ${perfFee}, txFeeBps: ${txFee}`);
+
+  const stored = (() => { try { return JSON.parse(localStorage.getItem("eigenvaults:wallet")); } catch { return null; }})();
+  const provider = window.ethereum;
+
+  if (stored?.address && provider) {
+    try {
+      btn.textContent = "Awaiting wallet signature…";
+      const message = [
+        "EigenVaults — Create Vault",
+        "",
+        `Name: ${name}`,
+        `Image hash: ${imageHash}`,
+        `TEE wallet: ${teeWallet}`,
+        `Performance fee: ${perfFee} bps`,
+        `Per-trade fee: ${txFee} bps`,
+        `Builder: ${stored.address}`,
+        `Nonce: ${Date.now()}`,
+      ].join("\n");
+
+      await provider.request({
+        method: "personal_sign",
+        params: [message, stored.address],
+      });
+      await appendLog(`✓ signed by ${stored.address.slice(0, 6)}…${stored.address.slice(-4)}`);
+    } catch (err) {
+      await appendLog(`✗ user rejected signature`);
+      btn.disabled = false;
+      btn.classList.remove("opacity-50");
+      btn.textContent = "Create vault for this agent";
+      return;
+    }
+  } else {
+    await appendLog("⚠ no wallet connected — running mock flow");
+  }
+
+  for (const [label, ms] of [
+    ["Submitting tx to L2", 1000],
+    ["Block confirmation", 1400],
+    ["Binding to AttestationRegistry", 700],
+    ["Funding Lighter sub-account allocation", 600],
+  ]) {
+    btn.textContent = label + "…";
+    await appendLog(`$ ${label.toLowerCase()}`);
+    await sleep(ms);
+  }
+
+  const seed = Array.from(name + imageHash).reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 11);
+  const hex = (n, len) => n.toString(16).padStart(len, "0");
+  const vaultAddr = "0x" + hex(seed, 8) + "f3e4Ac9d217B4E50f2C18".slice(0, 32);
+  const txHash = "0x" + hex(seed ^ 0x5eed, 8) + hex(seed * 13 >>> 0, 8) + "a0b1c2d3e4f50617".slice(0, 48);
+
+  await appendLog("");
+  await appendLog(`✓ vault deployed: ${vaultAddr}`);
+  await appendLog(`✓ tx: ${txHash.slice(0, 22)}…`);
+  await appendLog(`✓ attestation bound · valid`);
+
+  showSuccessCard({ name, vaultAddr, txHash });
+}
+
+function showSuccessCard({ name, vaultAddr, txHash }) {
+  const btn = createBtn();
+  const parent = btn.parentElement;
+  btn.remove();
+
+  const card = document.createElement("div");
+  card.className = "rounded-md p-5";
+  card.style.cssText = "background: oklch(var(--primary) / 0.08); border: 1px solid oklch(var(--primary) / 0.3);";
+  card.innerHTML = `
+    <div class="flex items-start justify-between gap-4 mb-3">
+      <div>
+        <div class="text-xs mono uppercase tracking-wider text-primary mb-1">Vault deployed</div>
+        <div class="display text-lg font-semibold">${name}</div>
+      </div>
+      <span class="badge badge-attested">TEE attested</span>
+    </div>
+    <dl class="text-sm space-y-1.5 mb-4">
+      <div class="flex justify-between gap-4"><span class="text-muted">Vault address</span><span class="mono">${vaultAddr.slice(0,10)}…${vaultAddr.slice(-6)}</span></div>
+      <div class="flex justify-between gap-4"><span class="text-muted">Transaction</span><span class="mono">${txHash.slice(0,10)}…${txHash.slice(-6)}</span></div>
+    </dl>
+    <div class="flex gap-3">
+      <a href="./vault.html?addr=${vaultAddr}" class="btn-primary flex-1 text-center px-5 py-2.5 rounded-md text-sm font-medium">View vault →</a>
+      <a href="./index.html" class="px-5 py-2.5 rounded-md border border-default hover:border-[color:oklch(var(--foreground))] text-sm font-medium text-center">Back to discover</a>
+    </div>
+  `;
+  parent.appendChild(card);
+
+  // ensure the badge style is available even if surface CSS varies
+  const style = document.createElement("style");
+  style.textContent = `
+    .badge { display: inline-flex; align-items: center; gap: 0.25rem;
+      font-family: "Geist Mono", monospace; font-size: 0.6875rem;
+      padding: 0.125rem 0.5rem; border-radius: 9999px;
+      border: 1px solid oklch(var(--border)); background: oklch(var(--card));
+      text-transform: uppercase; letter-spacing: 0.05em; }
+    .badge-attested { color: oklch(var(--primary));
+      border-color: oklch(var(--primary) / 0.3);
+      background: oklch(var(--primary) / 0.08); }
+  `;
+  document.head.appendChild(style);
 }
 
 if (document.readyState === "loading") {
