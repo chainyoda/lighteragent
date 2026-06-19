@@ -7,7 +7,15 @@
     if (!window.ES || !window.UI) return setTimeout(start, 30);
     const { fmt } = ES;
     const params = new URLSearchParams(location.search);
-    const v = ES.byId(params.get("id") || params.get("addr")) || ES.VAULTS[0];
+    const wanted = params.get("id") || params.get("addr");
+    const v = ES.byId(wanted) || ES.VAULTS[0];
+    // If a specific vault was requested but isn't in the local cache yet, it
+    // may still be arriving from the shared store — reload once it syncs in.
+    if (wanted && v.id !== wanted && v.addr !== wanted) {
+      window.addEventListener("vaults:updated", function once() {
+        if (ES.byId(wanted)) { window.removeEventListener("vaults:updated", once); location.reload(); }
+      });
+    }
     const a = ES.ARCHETYPES[v.archetype];
     document.title = `${v.name} — EigenStrategies`;
 

@@ -70,6 +70,18 @@ A reference agent (delta-neutral funding-rate carry across BTC/ETH/SOL) is in [`
 | `data.js` `ui.js` | Shared mock data layer (deterministic vault metrics, positions, fills, portfolios) + chart/sparkline/sort/toast helpers. |
 | `discover.js` `vault.js` `portfolio.js` `create.js` | Per-page logic. |
 | `wallet.js` | EIP-6963 wallet connection (MetaMask, Rabby, Coinbase, etc.). |
+| `store.js` `config.js` | Shared vault store — Supabase-backed when configured, localStorage fallback otherwise. |
+
+### Shared vault store (optional)
+
+By default, builder-created vaults are saved to the visitor's browser
+(`localStorage`) — visible only on that device. To make them **shared across
+all devices and visitors**, point `config.js` at a free Supabase project
+(`SUPABASE_URL` + anon key); setup SQL and steps are in
+[`config.js`](./config.js). The anon key is safe to ship in client code —
+access is governed by row-level-security policies. `store.js` syncs the shared
+`vaults` table into the local cache on load and writes new vaults back; if it's
+unconfigured or offline, everything falls back to `localStorage`.
 
 ## Build an agent in 30 lines
 

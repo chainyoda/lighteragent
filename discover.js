@@ -5,15 +5,22 @@
   function start() {
     if (!window.ES || !window.UI) return setTimeout(start, 30);
     const { ARCHETYPES, fmt } = ES;
-    // include builder-created vaults (persisted in localStorage) alongside samples
-    const VAULTS = ES.VAULTS.concat(ES.loadCustomVaults());
+    // sample vaults + builder-created vaults (local cache, synced from the
+    // shared store). Kept mutable so we can re-render when the store updates.
+    const VAULTS = [];
+    function refreshVaults() {
+      VAULTS.length = 0;
+      VAULTS.push(...ES.VAULTS, ...ES.loadCustomVaults());
+    }
+    refreshVaults();
 
     // ---- hero stats -----------------------------------------------------
-    const totalTvl = VAULTS.reduce((s, v) => s + v.tvl, 0);
-    const totalInv = VAULTS.reduce((s, v) => s + v.investors, 0);
-    document.getElementById("stat-tvl").textContent = fmt.usd(totalTvl);
-    document.getElementById("stat-vaults").textContent = String(VAULTS.length);
-    document.getElementById("stat-investors").textContent = totalInv.toLocaleString();
+    function refreshHero() {
+      document.getElementById("stat-tvl").textContent = fmt.usd(VAULTS.reduce((s, v) => s + v.tvl, 0));
+      document.getElementById("stat-vaults").textContent = String(VAULTS.length);
+      document.getElementById("stat-investors").textContent = VAULTS.reduce((s, v) => s + v.investors, 0).toLocaleString();
+    }
+    refreshHero();
 
     // ---- filter state ---------------------------------------------------
     const filters = { type: new Set(), market: new Set(), lev: new Set(), search: "", attested: false };
@@ -119,6 +126,13 @@
         name: v.name, tvl: v.tvl, apr: v.apr30, sharpe: v.stats.sharpe,
         mdd: v.stats.mdd, skin: v.skin, capacity: v.capacity,
       }[k]),
+    });
+
+    // re-render when the shared store syncs in newly-created vaults
+    window.addEventListener("vaults:updated", () => {
+      refreshVaults();
+      refreshHero();
+      api.refresh();
     });
 
     // ---- compare drawer + modal ----------------------------------------
