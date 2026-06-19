@@ -4,6 +4,62 @@ A permissionless, attested agent-vault platform where anyone can build, deploy, 
 
 **Live prototype:** https://chainyoda.github.io/lighteragent/
 
+---
+
+## What this actually is, in trader terms
+
+> Imagine a CTA where you can read the source code, prove the manager can't change strategy mid-flight, and pay no AUM fee — only performance.
+
+Three audiences, three plain-English answers:
+
+### If you're a strategy builder
+
+You write your strategy in **plain English** ("when BTC and ETH funding diverge by more than 12 bps, long the lower side, short the higher side, close at 4 bps"). The platform compiles that into Python, runs a backtest against historical Lighter data, and lets you deploy the same code into a Trusted Execution Environment on EigenCompute. The TEE gets its own wallet — that wallet is the only key allowed to place trades for the strategy.
+
+You can run it three ways:
+
+1. **Trade your own funds.** The TEE wallet trades a Lighter sub-account you fund yourself. Free until you ask outside capital to join.
+2. **List a vault.** Wrap the same agent in an ERC-4626 vault, set your performance fee (e.g. 20% of profits) and per-trade fee (e.g. 0.08% of notional), and anyone can deposit USDC. Their deposits get traded by the same algorithm under shared accounting.
+3. **Iterate.** Edit the prompt, re-backtest, redeploy. Each version produces a new attested image hash — investors in your old version get a 24h window to redeem before the rotation takes effect.
+
+You earn fees on outside capital, not on your own. There's no protocol cap on what you charge — investors see the fee schedule before depositing.
+
+### If you're an investor
+
+You're depositing USDC into what's effectively a **fully-transparent algorithmic hedge fund**, with three properties traditional funds don't give you:
+
+- **You can read the strategy.** The English description is published. The compiled Python is published. The image hash that's actually running is pinned onchain.
+- **The manager can't silently rug you.** The vault contract enforces that only the TEE wallet derived from the published image hash can move funds. If the builder wants to switch strategy, it's a public action that opens a redemption window.
+- **You hold a composable share token.** The vault is ERC-4626 — your shares are an ERC-20 you can transfer, lend against, or pull out at any time. No lockup, no LP-token mystery.
+
+What you're not protected from: market risk, the strategy being bad, Lighter halting, or the builder writing a strategy that loses money inside the rules. Backtests are not promises. Read them, look at max drawdown, check skin in the game.
+
+### If you're a quant looking at how to build on this
+
+The interface is one method:
+
+```python
+class Strategy:
+    def decide(self, state: MarketState) -> Iterable[Order]: ...
+```
+
+`MarketState` gives you free collateral, open positions, mid prices, funding rates. You return any orders you want submitted this tick. The runtime handles signing, fee accrual on each fill, NAV reporting, and graceful shutdown. The Python SDK ships with a Lighter client and a vault contract client; you don't write either.
+
+A reference agent (delta-neutral funding-rate carry across BTC/ETH/SOL) is in [`agents/funding-carry/`](./agents/funding-carry/) — fork it, change `decide()`, deploy.
+
+## How it's different from what's already out there
+
+| | **EigenStrategies** | Hyperliquid Vaults | Lighter Public Pools | Discretionary CTA |
+|---|---|---|---|---|
+| Anyone can be a builder | ✅ permissionless | ✅ | ❌ whitelisted operators | ❌ |
+| Strategy is verifiable / readable | ✅ TEE-attested | ❌ opaque | ❌ opaque | ❌ |
+| Manager can't swap logic mid-flight | ✅ image hash pinned onchain | ❌ | ❌ | ❌ |
+| Investor shares are composable ERC-20 | ✅ ERC-4626 | ❌ internal accounting | ❌ internal accounting | ❌ |
+| Fee structure | builder-set, no caps | fixed 10% perf | builder-set perf only | management + perf |
+| Where it trades | Lighter perps (v1) | Hyperliquid | Lighter | anywhere |
+
+---
+
 ## Repo layout
 
 | Path | What |
