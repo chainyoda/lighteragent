@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>EigenVaults — agent-traded ERC-4626 on Lighter</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  html, body { background:#0a0a0a; color:#e5e5e5; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .glow { box-shadow: 0 0 0 1px rgba(99,102,241,0.25), 0 0 40px -10px rgba(99,102,241,0.4); }
+  .spark path { stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body class="min-h-screen">
+<div id="root"></div>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useMemo } = React;
+
+// ----- mock data --------------------------------------------------------
+const VAULTS = [
+  {
+    id: "0xA1c2…F3e4",
+    name: "Momentum Macro",
+    builder: "0x9bF1…2c0a",
+    builderName: "alpha-lab.eth",
+    desc: "Cross-asset perp momentum on BTC/ETH/SOL with 1h/4h/1d signal stack. Risk-parity sizing, 3x max leverage.",
+    tvl: 2_840_000,
+    apr: 38.4,
+    perfFeeBps: 2000,
+    txFeeBps: 8,
+    age: 71,
+    attestation: "verified",
+    imageHash: "0x7f3c9b18e4a2…d10b",
+    nav: gen(60, 100, 0.018, 1.4),
+    investors: 124,
+  },
+  {
+    id: "0x4D9e…11Aa",
+    name: "Funding Harvester",
+    builder: "0x33eA…77Bd",
+    builderName: "fundingcat.eth",
+    desc: "Delta-neutral funding rate carry. Long perp / short perp pairs across Lighter markets when funding spread > 12bps/8h.",
+    tvl: 1_205_000,
+    apr: 22.1,
+    perfFeeBps: 1500,
+    txFeeBps: 5,
+    age: 42,
+    attestation: "verified",
+    imageHash: "0x2a1d44f0c9b1…9e22",
+    nav: gen(60, 100, 0.006, 0.4),
+    investors: 73,
+  },
+  {
+    id: "0xC0fE…d3aB",
+    name: "Mean Reversion 5m",
+    builder: "0x88aB…9a01",
+    builderName: "meanrev.eth",
+    desc: "Short-horizon BB mean-reversion, ETH-only, scalps liquidations. Hard 1.2x leverage cap.",
+    tvl: 412_300,
+    apr: 14.6,
+    perfFeeBps: 1000,
+    txFeeBps: 12,
+    age: 19,
+    attestation: "verified",
+    imageHash: "0x9d5c0e771cb3…4ff1",
+    nav: gen(60, 100, 0.011, 0.9),
+    investors: 38,
+  },
+  {
+    id: "0x77Ee…AA90",
+    name: "Yield-Stable LP",
+    builder: "0x5511…aBCD",
+    builderName: "stable.eth",
+    desc: "Conservative funding-rate book + liquidity-provision. Targets 12-15% APR with low drawdown.",
+    tvl: 5_120_000,
+    apr: 13.2,
+    perfFeeBps: 1000,
+    txFeeBps: 4,
+    age: 118,
+    attestation: "verified",
+    imageHash: "0x4421ab09cd11…ee01",
+    nav: gen(60, 100, 0.004, 0.2),
+    investors: 311,
+  },
+  {
+    id: "0x1234…5678",
+    name: "Breakout Hunter",
+    builder: "0xFa11…CafE",
+    builderName: "breakout.eth",
+    desc: "Volatility-expansion breakouts on alts. Scales into trends, hard stop -8% per position.",
+    tvl: 198_400,
+    apr: -4.7,
+    perfFeeBps: 2500,
+    txFeeBps: 10,
+    age: 11,
+    attestation: "pending",
+    imageHash: "0xabc1129ee004…77ff",
+    nav: gen(60, 100, -0.002, 1.8),
+    investors: 12,
+  },
+];
+
+function gen(n, start, drift, vol) {
+  let v = start, out = [v];
+  for (let i = 1; i < n; i++) {
+    const noise = (Math.sin(i * 1.7) + Math.cos(i * 0.9)) * 0.5;
+    v = Math.max(40, v * (1 + drift + noise * vol * 0.01));
+    out.push(v);
+  }
+  return out;
+}
+
+const fmtUsd = (n) =>
+  n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `$${(n / 1e3).toFixed(1)}k` : `$${n.toFixed(0)}`;
+const fmtPct = (n) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
+const bps = (n) => `${(n / 100).toFixed(2)}%`;
+
+// ----- ui ---------------------------------------------------------------
+function Logo() {
+  return (
+    <div className="flex items-center gap-2">
+      <svg width="28" height="28" viewBox="0 0 32 32" className="shrink-0">
+        <path d="M16 2 L29 9 V23 L16 30 L3 23 V9 Z" fill="none" stroke="#818cf8" strokeWidth="1.5" />
+        <path d="M16 8 L24 12 V20 L16 24 L8 20 V12 Z" fill="#818cf8" opacity="0.25" />
+        <circle cx="16" cy="16" r="2.5" fill="#818cf8" />
+      </svg>
+      <div className="font-semibold tracking-tight">EigenVaults</div>
+    </div>
+  );
+}
+
+function Nav({ route, setRoute, account, setAccount }) {
+  const link = (id, label) => (
+    <button
+      onClick={() => setRoute({ name: id })}
+      className={`px-3 py-1.5 text-sm rounded-md transition ${
+        route.name === id ? "bg-white/10 text-white" : "text-neutral-400 hover:text-white"
+      }`}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <header className="border-b border-white/5 bg-black/40 backdrop-blur sticky top-0 z-20">
+      <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
+        <div className="flex items-center gap-6">
+          <button onClick={() => setRoute({ name: "discover" })}><Logo /></button>
+          <nav className="flex items-center gap-1">
+            {link("discover", "Discover")}
+            {link("create", "Create vault")}
+            {link("portfolio", "Portfolio")}
+            {link("docs", "Docs")}
+          </nav>
+        </div>
+        <button
+          onClick={() => setAccount(account ? null : "0x4eA1…9Bc2")}
+          className="text-sm px-3 py-1.5 rounded-md border border-white/10 hover:border-white/30"
+        >
+          {account ? <span className="mono">{account}</span> : "Connect wallet"}
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function Spark({ data, color = "#818cf8", w = 120, h = 32 }) {
+  const min = Math.min(...data), max = Math.max(...data);
+  const span = max - min || 1;
+  const path = data
+    .map((v, i) => {
+      const x = (i / (data.length - 1)) * w;
+      const y = h - ((v - min) / span) * h;
+      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return (
+    <svg width={w} height={h} className="spark">
+      <path d={path} fill="none" stroke={color} strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function AttestationBadge({ status }) {
+  if (status === "verified")
+    return (
+      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12l5 5L20 7" /></svg>
+        TEE attested
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
+      attestation pending
+    </span>
+  );
+}
+
+function Hero({ onPrimary }) {
+  return (
+    <div className="grid-bg border-b border-white/5">
+      <div className="max-w-6xl mx-auto px-5 py-16">
+        <div className="text-xs uppercase tracking-widest text-indigo-300/80 mb-3">Eigen reference app</div>
+        <h1 className="text-4xl md:text-5xl font-semibold tracking-tight max-w-3xl">
+          Trading agents, attested in a TEE,<br />
+          <span className="text-indigo-300">funded by anyone.</span>
+        </h1>
+        <p className="text-neutral-400 mt-4 max-w-2xl">
+          Builders deploy a strategy to EigenCompute. Investors deposit USDC into an ERC-4626 vault that pins the
+          attested image hash. The same algorithm trades for everyone on Lighter perps.
+        </p>
+        <div className="mt-7 flex gap-3">
+          <button
+            onClick={onPrimary}
+            className="px-4 py-2 rounded-md bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium glow"
+          >
+            Browse vaults
+          </button>
+          <a
+            href="https://github.com/chainyoda/lighteragent"
+            target="_blank"
+            className="px-4 py-2 rounded-md border border-white/15 hover:border-white/30 text-sm"
+          >
+            Read the architecture
+          </a>
+        </div>
+        <div className="mt-10 grid grid-cols-3 max-w-xl gap-6">
+          <Stat label="Total TVL" value={fmtUsd(VAULTS.reduce((a, v) => a + v.tvl, 0))} />
+          <Stat label="Active vaults" value={VAULTS.length} />
+          <Stat label="Investors" value={VAULTS.reduce((a, v) => a + v.investors, 0)} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value }) {
+  return (
+    <div>
+      <div className="text-xs text-neutral-500 uppercase tracking-wider">{label}</div>
+      <div className="text-2xl font-semibold mono mt-0.5">{value}</div>
+    </div>
+  );
+}
+
+function Discover({ setRoute }) {
+  const [sort, setSort] = useState("apr");
+  const sorted = useMemo(() => {
+    const c = [...VAULTS];
+    c.sort((a, b) => (sort === "apr" ? b.apr - a.apr : sort === "tvl" ? b.tvl - a.tvl : b.age - a.age));
+    return c;
+  }, [sort]);
+  return (
+    <>
+      <Hero onPrimary={() => document.getElementById("vaults")?.scrollIntoView({ behavior: "smooth" })} />
+      <div id="vaults" className="max-w-6xl mx-auto px-5 py-10">
+        <div className="flex items-end justify-between mb-5">
+          <div>
+            <div className="text-xs text-neutral-500 uppercase tracking-wider">All vaults</div>
+            <h2 className="text-xl font-semibold">Discover</h2>
+          </div>
+          <div className="flex gap-1 text-xs">
+            {[
+              ["apr", "APR"],
+              ["tvl", "TVL"],
+              ["age", "Newest"],
+            ].map(([k, l]) => (
+              <button
+                key={k}
+                onClick={() => setSort(k)}
+                className={`px-2.5 py-1 rounded-md ${
+                  sort === k ? "bg-white/10 text-white" : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-xl border border-white/5 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-white/[0.02] text-neutral-500 text-xs uppercase tracking-wider">
+              <tr>
+                <th className="text-left px-4 py-3 font-normal">Vault</th>
+                <th className="text-right px-4 py-3 font-normal">TVL</th>
+                <th className="text-right px-4 py-3 font-normal">30d APR</th>
+                <th className="text-right px-4 py-3 font-normal">NAV</th>
+                <th className="text-right px-4 py-3 font-normal">Perf / Tx fee</th>
+                <th className="text-right px-4 py-3 font-normal">Age</th>
+                <th className="text-right px-4 py-3 font-normal"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((v) => (
+                <tr
+                  key={v.id}
+                  onClick={() => setRoute({ name: "vault", id: v.id })}
+                  className="border-t border-white/5 hover:bg-white/[0.03] cursor-pointer"
+                >
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-md bg-gradient-to-br from-indigo-500/30 to-fuchsia-500/30 border border-white/10 flex items-center justify-center text-xs">
+                        {v.name[0]}
+                      </div>
+                      <div>
+                        <div className="font-medium flex items-center gap-2">
+                          {v.name} <AttestationBadge status={v.attestation} />
+                        </div>
+                        <div className="text-xs text-neutral-500 mono">by {v.builderName}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right mono">{fmtUsd(v.tvl)}</td>
+                  <td className={`px-4 py-3 text-right mono ${v.apr >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    {fmtPct(v.apr)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="inline-block">
+                      <Spark data={v.nav} color={v.apr >= 0 ? "#34d399" : "#fb7185"} w={90} h={26} />
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right mono text-neutral-300">
+                    {bps(v.perfFeeBps)} / {bps(v.txFeeBps)}
+                  </td>
+                  <td className="px-4 py-3 text-right text-neutral-400">{v.age}d</td>
+                  <td className="px-4 py-3 text-right">
+                    <span className="text-indigo-300 text-xs">View →</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function VaultDetail({ id, setRoute, account }) {
+  const v = VAULTS.find((x) => x.id === id) || VAULTS[0];
+  const [tab, setTab] = useState("deposit");
+  const [amt, setAmt] = useState("1000");
+  const navNow = v.nav[v.nav.length - 1];
+  const shares = (Number(amt || 0) / navNow).toFixed(4);
+  return (
+    <div className="max-w-6xl mx-auto px-5 py-8">
+      <button
+        onClick={() => setRoute({ name: "discover" })}
+        className="text-sm text-neutral-400 hover:text-white mb-4"
+      >
+        ← Back to vaults
+      </button>
+      <div className="flex items-start justify-between gap-6 mb-6">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-indigo-500/30 to-fuchsia-500/30 border border-white/10 flex items-center justify-center text-lg">
+              {v.name[0]}
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold flex items-center gap-3">
+                {v.name} <AttestationBadge status={v.attestation} />
+              </h1>
+              <div className="text-sm text-neutral-400 mono">{v.id} · by {v.builderName}</div>
+            </div>
+          </div>
+          <p className="mt-4 text-neutral-300 max-w-2xl">{v.desc}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="rounded-xl border border-white/5 p-5">
+            <div className="flex items-end justify-between mb-4">
+              <div>
+                <div className="text-xs text-neutral-500 uppercase tracking-wider">NAV (60d)</div>
+                <div className="text-2xl font-semibold mono">{navNow.toFixed(3)} USDC</div>
+              </div>
+              <div className={`text-sm mono ${v.apr >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{fmtPct(v.apr)} APR</div>
+            </div>
+            <Spark data={v.nav} color={v.apr >= 0 ? "#34d399" : "#fb7185"} w={760} h={120} />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Stat label="TVL" value={fmtUsd(v.tvl)} />
+            <Stat label="Investors" value={v.investors} />
+            <Stat label="Perf fee" value={bps(v.perfFeeBps)} />
+            <Stat label="Tx fee" value={bps(v.txFeeBps)} />
+          </div>
+
+          <div className="rounded-xl border border-white/5 p-5">
+            <div className="text-xs text-neutral-500 uppercase tracking-wider mb-3">Trust & attestation</div>
+            <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+              <Row k="EigenCompute image hash" v={<span className="mono text-indigo-300">{v.imageHash}</span>} />
+              <Row k="TEE wallet" v={<span className="mono">0x9B1c…74d2</span>} />
+              <Row k="Lighter sub-account" v={<span className="mono">vault-0042</span>} />
+              <Row k="Attestation registry" v={<span className="text-emerald-300">bound · valid</span>} />
+            </dl>
+            <div className="text-xs text-neutral-500 mt-3 leading-relaxed">
+              The vault contract enforces that only the TEE wallet derived from this image hash can route funds to
+              Lighter. To rotate the strategy the builder must call <code className="text-neutral-300">proposeImage</code> and
+              wait for a 24h investor exit window.
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-xl border border-white/5 overflow-hidden">
+            <div className="flex">
+              {[
+                ["deposit", "Deposit"],
+                ["redeem", "Redeem"],
+              ].map(([k, l]) => (
+                <button
+                  key={k}
+                  onClick={() => setTab(k)}
+                  className={`flex-1 py-3 text-sm font-medium ${
+                    tab === k ? "bg-white/[0.04] text-white border-b border-indigo-400" : "text-neutral-400"
+                  }`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+            <div className="p-5 space-y-3">
+              <label className="block text-xs text-neutral-500 uppercase tracking-wider">
+                {tab === "deposit" ? "Amount (USDC)" : "Shares"}
+              </label>
+              <div className="flex items-center gap-2 border border-white/10 rounded-md px-3 py-2 focus-within:border-indigo-400">
+                <input
+                  value={amt}
+                  onChange={(e) => setAmt(e.target.value.replace(/[^\d.]/g, ""))}
+                  className="bg-transparent flex-1 outline-none mono"
+                  placeholder="0.00"
+                />
+                <span className="text-xs text-neutral-500">{tab === "deposit" ? "USDC" : "shares"}</span>
+              </div>
+              <div className="flex justify-between text-xs text-neutral-500">
+                <span>{tab === "deposit" ? "You receive" : "You receive"}</span>
+                <span className="mono text-neutral-300">
+                  {tab === "deposit"
+                    ? `${shares} shares`
+                    : `${(Number(amt || 0) * navNow).toFixed(2)} USDC`}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs text-neutral-500">
+                <span>NAV</span>
+                <span className="mono text-neutral-300">{navNow.toFixed(3)}</span>
+              </div>
+              {tab === "redeem" && (
+                <div className="text-xs text-amber-300/80 bg-amber-500/10 border border-amber-500/20 rounded-md p-2">
+                  If free USDC is short the strategy will be pinged to bridge from Lighter; redemption settles
+                  within ~30s.
+                </div>
+              )}
+              <button
+                disabled={!account}
+                onClick={() => alert(`${tab === "deposit" ? "Depositing" : "Redeeming"} ${amt} on ${v.name} (mock)`)}
+                className="w-full py-2.5 rounded-md bg-indigo-500 hover:bg-indigo-400 disabled:bg-white/5 disabled:text-neutral-500 text-white text-sm font-medium glow disabled:shadow-none"
+              >
+                {!account ? "Connect wallet to continue" : tab === "deposit" ? "Deposit USDC" : "Redeem shares"}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/5 p-5 space-y-2 text-sm">
+            <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Builder</div>
+            <div className="flex items-center justify-between">
+              <span className="mono">{v.builder}</span>
+              <span className="text-neutral-400">{v.builderName}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-neutral-500">
+              <span>Skin in the game</span>
+              <span className="mono text-neutral-300">12.4%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Row({ k, v }) {
+  return (
+    <div className="flex justify-between items-center text-sm">
+      <span className="text-neutral-500">{k}</span>
+      <span>{v}</span>
+    </div>
+  );
+}
+
+function Create({ setRoute }) {
+  const [form, setForm] = useState({
+    name: "",
+    desc: "",
+    imageHash: "",
+    teeWallet: "",
+    perfFeeBps: 2000,
+    txFeeBps: 8,
+  });
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const valid = form.name && form.imageHash.startsWith("0x") && form.teeWallet.startsWith("0x");
+  return (
+    <div className="max-w-3xl mx-auto px-5 py-12">
+      <div className="text-xs uppercase tracking-widest text-indigo-300/80 mb-2">Builder dashboard</div>
+      <h1 className="text-3xl font-semibold tracking-tight">Create a vault</h1>
+      <p className="text-neutral-400 mt-2 mb-8">
+        Deploy your strategy to EigenCompute first, then paste the attested image hash and TEE wallet here. The factory
+        will deploy an ERC-4626 vault and bind it in the attestation registry.
+      </p>
+
+      <div className="space-y-5">
+        <Step n={1} title="Build & attest your image">
+          <div className="bg-black/40 rounded-md p-3 mono text-xs text-neutral-300 border border-white/5">
+            <div className="text-neutral-500"># in your strategy repo</div>
+            <div>$ ecloud compute app deploy</div>
+            <div className="text-emerald-400">→ image hash: <span className="text-indigo-300">0x7f3c9b…d10b</span></div>
+            <div className="text-emerald-400">→ tee wallet: <span className="text-indigo-300">0x9B1c…74d2</span></div>
+          </div>
+        </Step>
+
+        <Step n={2} title="Vault metadata">
+          <Field label="Name">
+            <input value={form.name} onChange={set("name")} placeholder="Momentum Macro"
+              className="w-full bg-transparent border border-white/10 rounded-md px-3 py-2 outline-none focus:border-indigo-400" />
+          </Field>
+          <Field label="Strategy description">
+            <textarea value={form.desc} onChange={set("desc")} rows={3} placeholder="One paragraph describing the algo, markets, and risk"
+              className="w-full bg-transparent border border-white/10 rounded-md px-3 py-2 outline-none focus:border-indigo-400" />
+          </Field>
+        </Step>
+
+        <Step n={3} title="Attestation binding">
+          <Field label="EigenCompute image hash">
+            <input value={form.imageHash} onChange={set("imageHash")} placeholder="0x…"
+              className="w-full bg-transparent border border-white/10 rounded-md px-3 py-2 outline-none focus:border-indigo-400 mono" />
+          </Field>
+          <Field label="TEE wallet (KMS-derived)">
+            <input value={form.teeWallet} onChange={set("teeWallet")} placeholder="0x…"
+              className="w-full bg-transparent border border-white/10 rounded-md px-3 py-2 outline-none focus:border-indigo-400 mono" />
+          </Field>
+        </Step>
+
+        <Step n={4} title="Fees">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Performance fee (bps)">
+              <input type="number" value={form.perfFeeBps} onChange={set("perfFeeBps")}
+                className="w-full bg-transparent border border-white/10 rounded-md px-3 py-2 outline-none focus:border-indigo-400 mono" />
+              <div className="text-xs text-neutral-500 mt-1">{bps(form.perfFeeBps)} on PnL above HWM</div>
+            </Field>
+            <Field label="Per-trade fee (bps)">
+              <input type="number" value={form.txFeeBps} onChange={set("txFeeBps")}
+                className="w-full bg-transparent border border-white/10 rounded-md px-3 py-2 outline-none focus:border-indigo-400 mono" />
+              <div className="text-xs text-neutral-500 mt-1">{bps(form.txFeeBps)} on trade notional</div>
+            </Field>
+          </div>
+          <div className="text-xs text-neutral-500 mt-2">No protocol caps. Investors see your fee schedule prominently.</div>
+        </Step>
+
+        <button
+          disabled={!valid}
+          onClick={() => alert("VaultFactory.createVault tx submitted (mock)")}
+          className="w-full py-3 rounded-md bg-indigo-500 hover:bg-indigo-400 disabled:bg-white/5 disabled:text-neutral-500 text-white text-sm font-medium glow disabled:shadow-none"
+        >
+          {valid ? "Deploy vault" : "Fill name, image hash and TEE wallet"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Step({ n, title, children }) {
+  return (
+    <div className="rounded-xl border border-white/5 p-5">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="h-6 w-6 rounded-full bg-indigo-500/20 text-indigo-300 text-xs flex items-center justify-center mono">
+          {n}
+        </div>
+        <div className="font-medium">{title}</div>
+      </div>
+      <div className="space-y-3">{children}</div>
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <label className="block">
+      <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">{label}</div>
+      {children}
+    </label>
+  );
+}
+
+function Portfolio({ account, setRoute }) {
+  if (!account)
+    return (
+      <div className="max-w-md mx-auto px-5 py-24 text-center">
+        <div className="text-lg">Connect your wallet to see your positions.</div>
+      </div>
+    );
+  const positions = VAULTS.slice(0, 2).map((v) => ({ ...v, shares: 132.4, value: 14_280 }));
+  return (
+    <div className="max-w-6xl mx-auto px-5 py-10">
+      <div className="text-xs text-neutral-500 uppercase tracking-wider">Your positions</div>
+      <h1 className="text-2xl font-semibold mb-6">Portfolio</h1>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+        <Stat label="Deposited" value="$28,560" />
+        <Stat label="Current value" value="$31,420" />
+        <Stat label="P&L" value={<span className="text-emerald-400">+$2,860 (+10.0%)</span>} />
+      </div>
+      <div className="rounded-xl border border-white/5 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-white/[0.02] text-neutral-500 text-xs uppercase tracking-wider">
+            <tr>
+              <th className="text-left px-4 py-3 font-normal">Vault</th>
+              <th className="text-right px-4 py-3 font-normal">Shares</th>
+              <th className="text-right px-4 py-3 font-normal">Value</th>
+              <th className="text-right px-4 py-3 font-normal"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {positions.map((p) => (
+              <tr key={p.id} className="border-t border-white/5">
+                <td className="px-4 py-3">{p.name}</td>
+                <td className="px-4 py-3 text-right mono">{p.shares}</td>
+                <td className="px-4 py-3 text-right mono">{fmtUsd(p.value)}</td>
+                <td className="px-4 py-3 text-right">
+                  <button onClick={() => setRoute({ name: "vault", id: p.id })} className="text-indigo-300 text-xs">Manage →</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function Docs() {
+  return (
+    <div className="max-w-3xl mx-auto px-5 py-12 prose prose-invert">
+      <h1>How EigenVaults works</h1>
+      <p>Three planes:</p>
+      <ol>
+        <li><b>Custody</b> — USDC sits in an ERC-4626 vault on L2. Investors mint and burn shares.</li>
+        <li><b>Execution</b> — the strategy runs in an EigenCompute TEE. Its KMS-derived wallet is the only key allowed to bridge funds to Lighter.</li>
+        <li><b>Settlement</b> — each vault owns one Lighter sub-account; PnL flows back through the bridge.</li>
+      </ol>
+      <p>The full architecture is in the <a href="https://github.com/chainyoda/lighteragent">README</a>.</p>
+    </div>
+  );
+}
+
+function App() {
+  const [route, setRoute] = useState({ name: "discover" });
+  const [account, setAccount] = useState(null);
+  return (
+    <div>
+      <Nav route={route} setRoute={setRoute} account={account} setAccount={setAccount} />
+      {route.name === "discover" && <Discover setRoute={setRoute} />}
+      {route.name === "vault" && <VaultDetail id={route.id} setRoute={setRoute} account={account} />}
+      {route.name === "create" && <Create setRoute={setRoute} />}
+      {route.name === "portfolio" && <Portfolio account={account} setRoute={setRoute} />}
+      {route.name === "docs" && <Docs />}
+      <footer className="border-t border-white/5 mt-16">
+        <div className="max-w-6xl mx-auto px-5 py-6 text-xs text-neutral-500 flex justify-between">
+          <div>EigenVaults · prototype · all data is mocked</div>
+          <a href="https://github.com/chainyoda/lighteragent" className="hover:text-neutral-300">GitHub →</a>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
