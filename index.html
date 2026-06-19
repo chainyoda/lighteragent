@@ -55,6 +55,18 @@
   .row-hover:hover { background: oklch(var(--well) / 0.5); }
   .icon-tile-primary { background: oklch(var(--primary) / 0.1); color: oklch(var(--primary)); }
   .icon-tile-accent { background: oklch(var(--accent) / 0.12); color: oklch(var(--accent)); }
+  .badge-loss { color: oklch(var(--destructive)); border-color: oklch(var(--destructive) / 0.3); background: oklch(var(--destructive) / 0.08); }
+  .chip {
+    font-family: "Geist Mono", monospace; font-size: 0.7rem; cursor: pointer;
+    padding: 0.25rem 0.7rem; border-radius: 9999px; border: 1px solid oklch(var(--border));
+    background: oklch(var(--card)); color: oklch(var(--muted-foreground));
+    text-transform: uppercase; letter-spacing: 0.04em; transition: all 0.12s; white-space: nowrap;
+  }
+  .chip:hover { border-color: oklch(var(--foreground)); }
+  .chip[aria-pressed="true"] { background: oklch(var(--primary) / 0.1); color: oklch(var(--primary)); border-color: oklch(var(--primary) / 0.4); }
+  .spark { display: block; }
+  th[data-key]:hover { color: oklch(var(--foreground)); }
+  .cmp-checkbox { accent-color: oklch(var(--primary)); width: 0.95rem; height: 0.95rem; cursor: pointer; }
 </style>
 </head>
 <body class="min-h-screen">
@@ -71,6 +83,7 @@
     </a>
     <nav class="flex items-center gap-1 text-sm">
       <a href="./index.html" class="px-3 py-1.5 rounded-md font-medium">Discover</a>
+      <a href="./portfolio.html" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:oklch(var(--foreground))]">Portfolio</a>
       <a href="./create.html" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:oklch(var(--foreground))]">Build your own agent</a>
       <a href="https://github.com/chainyoda/lighteragent" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:oklch(var(--foreground))]">Docs</a>
     </nav>
@@ -107,132 +120,96 @@
     <div class="mt-14 grid grid-cols-3 max-w-2xl gap-10">
       <div>
         <div class="mono text-xs uppercase tracking-wider text-muted">Total TVL</div>
-        <div class="display text-3xl font-semibold mt-1">$9.78M</div>
+        <div id="stat-tvl" class="display text-3xl font-semibold mt-1">—</div>
       </div>
       <div>
         <div class="mono text-xs uppercase tracking-wider text-muted">Active vaults</div>
-        <div class="display text-3xl font-semibold mt-1">5</div>
+        <div id="stat-vaults" class="display text-3xl font-semibold mt-1">—</div>
       </div>
       <div>
         <div class="mono text-xs uppercase tracking-wider text-muted">Investors</div>
-        <div class="display text-3xl font-semibold mt-1">558</div>
+        <div id="stat-investors" class="display text-3xl font-semibold mt-1">—</div>
       </div>
     </div>
   </div>
 </section>
 
 <section id="vaults" class="max-w-6xl mx-auto px-6 py-14">
-  <div class="flex items-end justify-between mb-6">
+  <div class="flex items-end justify-between mb-5">
     <div>
       <div class="mono text-xs uppercase tracking-wider text-muted">All vaults</div>
       <h2 class="display text-2xl font-semibold mt-1">Frontier Strategies</h2>
     </div>
-    <div class="text-sm text-muted">Sorted by 30d APR</div>
+    <div class="text-sm text-muted">Click any column to sort · check rows to compare</div>
   </div>
 
-  <div class="surface rounded-xl overflow-hidden">
-    <table class="w-full text-sm">
+  <!-- Filters -->
+  <div class="surface rounded-xl p-4 mb-4 space-y-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <input id="search" type="text" placeholder="Search vaults or builders…"
+             class="flex-1 min-w-[200px] text-sm border border-default rounded-md px-3 py-2 outline-none focus:border-[color:oklch(var(--foreground))] bg-[color:oklch(var(--background))]" />
+      <label class="flex items-center gap-2 text-xs mono text-muted px-2">
+        <input id="filter-attested" type="checkbox" class="cmp-checkbox" /> TEE-attested only
+      </label>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="flex items-center gap-1.5 flex-wrap" data-filtergroup="type">
+        <span class="mono text-[0.65rem] uppercase tracking-wider text-muted mr-1">Type</span>
+      </div>
+      <div class="h-4 w-px bg-[color:oklch(var(--border))] hidden md:block"></div>
+      <div class="flex items-center gap-1.5 flex-wrap" data-filtergroup="market">
+        <span class="mono text-[0.65rem] uppercase tracking-wider text-muted mr-1">Market</span>
+      </div>
+      <div class="h-4 w-px bg-[color:oklch(var(--border))] hidden md:block"></div>
+      <div class="flex items-center gap-1.5 flex-wrap" data-filtergroup="lev">
+        <span class="mono text-[0.65rem] uppercase tracking-wider text-muted mr-1">Leverage</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="surface rounded-xl overflow-x-auto">
+    <table id="vault-table" class="w-full text-sm min-w-[920px]">
       <thead class="well border-b border-default">
         <tr class="mono text-[0.7rem] uppercase tracking-[0.12em] text-muted">
-          <th class="text-left px-5 py-3 font-medium">Vault</th>
-          <th class="text-right px-5 py-3 font-medium">TVL</th>
-          <th class="text-right px-5 py-3 font-medium">30d APR</th>
-          <th class="text-right px-5 py-3 font-medium">Perf / Tx fee</th>
-          <th class="text-right px-5 py-3 font-medium">Age</th>
-          <th class="text-right px-5 py-3 font-medium"></th>
+          <th class="text-left px-4 py-3 font-medium w-8"></th>
+          <th class="text-left px-4 py-3 font-medium" data-key="name">Vault <span class="sort-arrow"></span></th>
+          <th class="text-left px-2 py-3 font-medium">60d</th>
+          <th class="text-right px-4 py-3 font-medium" data-key="tvl">TVL <span class="sort-arrow"></span></th>
+          <th class="text-right px-4 py-3 font-medium" data-key="apr">APR <span class="sort-arrow"></span></th>
+          <th class="text-right px-4 py-3 font-medium" data-key="sharpe">Sharpe <span class="sort-arrow"></span></th>
+          <th class="text-right px-4 py-3 font-medium" data-key="mdd">Max DD <span class="sort-arrow"></span></th>
+          <th class="text-right px-4 py-3 font-medium" data-key="skin">Skin <span class="sort-arrow"></span></th>
+          <th class="text-right px-4 py-3 font-medium" data-key="capacity">Capacity <span class="sort-arrow"></span></th>
+          <th class="text-right px-4 py-3 font-medium" data-key="fees">Fees</th>
+          <th class="text-right px-4 py-3 font-medium"></th>
         </tr>
       </thead>
-      <tbody style="background:oklch(var(--card))">
-
-        <tr class="border-t border-default row-hover transition">
-          <td class="px-5 py-4">
-            <a href="./vault.html?id=momentum" class="flex items-center gap-3.5">
-              <div class="h-9 w-9 rounded-md flex items-center justify-center display font-semibold icon-tile-primary">M</div>
-              <div>
-                <div class="font-medium flex items-center gap-2">Momentum Macro <span class="badge badge-attested">TEE attested</span></div>
-                <div class="text-xs text-muted mono">by alpha-lab.eth</div>
-              </div>
-            </a>
-          </td>
-          <td class="px-5 py-4 text-right mono">$2.84M</td>
-          <td class="px-5 py-4 text-right mono text-primary font-semibold">+38.4%</td>
-          <td class="px-5 py-4 text-right mono text-muted">20.00% / 0.08%</td>
-          <td class="px-5 py-4 text-right text-muted mono">71d</td>
-          <td class="px-5 py-4 text-right"><a href="./vault.html?id=momentum" class="text-accent text-xs font-medium mono">VIEW →</a></td>
-        </tr>
-
-        <tr class="border-t border-default row-hover transition">
-          <td class="px-5 py-4">
-            <a href="./vault.html?id=funding" class="flex items-center gap-3.5">
-              <div class="h-9 w-9 rounded-md flex items-center justify-center display font-semibold icon-tile-primary">F</div>
-              <div>
-                <div class="font-medium flex items-center gap-2">Funding Harvester <span class="badge badge-attested">TEE attested</span></div>
-                <div class="text-xs text-muted mono">by fundingcat.eth</div>
-              </div>
-            </a>
-          </td>
-          <td class="px-5 py-4 text-right mono">$1.21M</td>
-          <td class="px-5 py-4 text-right mono text-primary font-semibold">+22.1%</td>
-          <td class="px-5 py-4 text-right mono text-muted">15.00% / 0.05%</td>
-          <td class="px-5 py-4 text-right text-muted mono">42d</td>
-          <td class="px-5 py-4 text-right"><a href="./vault.html?id=funding" class="text-accent text-xs font-medium mono">VIEW →</a></td>
-        </tr>
-
-        <tr class="border-t border-default row-hover transition">
-          <td class="px-5 py-4">
-            <a href="./vault.html?id=meanrev" class="flex items-center gap-3.5">
-              <div class="h-9 w-9 rounded-md flex items-center justify-center display font-semibold icon-tile-primary">R</div>
-              <div>
-                <div class="font-medium flex items-center gap-2">Mean Reversion 5m <span class="badge badge-attested">TEE attested</span></div>
-                <div class="text-xs text-muted mono">by meanrev.eth</div>
-              </div>
-            </a>
-          </td>
-          <td class="px-5 py-4 text-right mono">$412k</td>
-          <td class="px-5 py-4 text-right mono text-primary font-semibold">+14.6%</td>
-          <td class="px-5 py-4 text-right mono text-muted">10.00% / 0.12%</td>
-          <td class="px-5 py-4 text-right text-muted mono">19d</td>
-          <td class="px-5 py-4 text-right"><a href="./vault.html?id=meanrev" class="text-accent text-xs font-medium mono">VIEW →</a></td>
-        </tr>
-
-        <tr class="border-t border-default row-hover transition">
-          <td class="px-5 py-4">
-            <a href="./vault.html?id=stable" class="flex items-center gap-3.5">
-              <div class="h-9 w-9 rounded-md flex items-center justify-center display font-semibold icon-tile-primary">Y</div>
-              <div>
-                <div class="font-medium flex items-center gap-2">Yield-Stable LP <span class="badge badge-attested">TEE attested</span></div>
-                <div class="text-xs text-muted mono">by stable.eth</div>
-              </div>
-            </a>
-          </td>
-          <td class="px-5 py-4 text-right mono">$5.12M</td>
-          <td class="px-5 py-4 text-right mono text-primary font-semibold">+13.2%</td>
-          <td class="px-5 py-4 text-right mono text-muted">10.00% / 0.04%</td>
-          <td class="px-5 py-4 text-right text-muted mono">118d</td>
-          <td class="px-5 py-4 text-right"><a href="./vault.html?id=stable" class="text-accent text-xs font-medium mono">VIEW →</a></td>
-        </tr>
-
-        <tr class="border-t border-default row-hover transition">
-          <td class="px-5 py-4">
-            <a href="./vault.html?id=breakout" class="flex items-center gap-3.5">
-              <div class="h-9 w-9 rounded-md flex items-center justify-center display font-semibold icon-tile-accent">B</div>
-              <div>
-                <div class="font-medium flex items-center gap-2">Breakout Hunter <span class="badge badge-pending">attestation pending</span></div>
-                <div class="text-xs text-muted mono">by breakout.eth</div>
-              </div>
-            </a>
-          </td>
-          <td class="px-5 py-4 text-right mono">$198k</td>
-          <td class="px-5 py-4 text-right mono font-semibold" style="color:oklch(var(--destructive))">-4.7%</td>
-          <td class="px-5 py-4 text-right mono text-muted">25.00% / 0.10%</td>
-          <td class="px-5 py-4 text-right text-muted mono">11d</td>
-          <td class="px-5 py-4 text-right"><a href="./vault.html?id=breakout" class="text-accent text-xs font-medium mono">VIEW →</a></td>
-        </tr>
-
-      </tbody>
+      <tbody id="vault-rows" style="background:oklch(var(--card))"></tbody>
     </table>
+    <div id="empty-state" class="hidden text-center text-muted text-sm py-12">No vaults match these filters.</div>
   </div>
 </section>
+
+<!-- Compare drawer -->
+<div id="compare-bar" class="hidden fixed bottom-0 inset-x-0 z-40 border-t border-default" style="background:oklch(var(--card))">
+  <div class="max-w-6xl mx-auto px-6 py-3 flex items-center gap-4">
+    <div class="mono text-xs uppercase tracking-wider text-muted">Compare</div>
+    <div id="compare-chips" class="flex items-center gap-2 flex-1 flex-wrap"></div>
+    <button id="compare-open" class="btn-primary px-4 py-2 rounded-md text-sm font-medium">Compare →</button>
+    <button id="compare-clear" class="text-xs mono text-muted hover:text-[color:oklch(var(--foreground))]">CLEAR</button>
+  </div>
+</div>
+
+<!-- Compare modal -->
+<div id="compare-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:oklch(0.255 0.012 122 / 0.45);backdrop-filter:blur(4px)">
+  <div class="surface rounded-xl w-full max-w-4xl max-h-[85vh] overflow-auto">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-default sticky top-0" style="background:oklch(var(--card))">
+      <div class="display text-xl font-semibold">Side-by-side comparison</div>
+      <button id="compare-close" class="text-muted text-2xl leading-none">&times;</button>
+    </div>
+    <div id="compare-body" class="p-6 overflow-x-auto"></div>
+  </div>
+</div>
 
 <section class="border-t border-default">
   <div class="max-w-6xl mx-auto px-6 py-16">
@@ -260,11 +237,14 @@
 
 <footer class="border-t border-default">
   <div class="max-w-6xl mx-auto px-6 py-8 text-xs text-muted flex justify-between mono uppercase tracking-wider">
-    <div>EigenStrategies · prototype · all data is mocked</div>
+    <div>EigenStrategies · prototype · testnet — simulated data</div>
     <a href="https://github.com/chainyoda/lighteragent" class="hover:text-[color:oklch(var(--foreground))]">GitHub →</a>
   </div>
 </footer>
 
+<script src="./data.js" defer></script>
+<script src="./ui.js" defer></script>
+<script src="./discover.js" defer></script>
 <script src="./wallet.js" defer></script>
 </body>
 </html>

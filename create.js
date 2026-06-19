@@ -17,6 +17,93 @@ const attCard = () => document.getElementById("attestation-card");
 const createBtn = () => document.getElementById("create-vault-btn");
 const editorStatus = () => document.getElementById("editor-status");
 
+let deployMode = "paper";
+let codeDirty = false;
+
+function readParams() {
+  return {
+    lev: parseFloat(document.getElementById("p-lev")?.value || 2),
+    size: parseFloat(document.getElementById("p-size")?.value || 5),
+    stop: parseFloat(document.getElementById("p-stop")?.value || 2),
+  };
+}
+
+// Generate a plausible Strategy.decide() from the prose + params. Not a
+// real compiler — but it reflects the knobs so editing feels truthful.
+function generateCode(prose, params) {
+  const arch = detectArchetype(prose.toLowerCase());
+  const markets = /sol/i.test(prose) ? '["BTC-PERP", "ETH-PERP", "SOL-PERP"]'
+    : /eth/i.test(prose) && !/btc/i.test(prose) ? '["ETH-PERP"]'
+    : '["BTC-PERP", "ETH-PERP"]';
+  const body = {
+    funding: `        # delta-neutral funding carry
+        spread = state.funding["ETH-PERP"] - state.funding["BTC-PERP"]
+        if abs(spread) > self.entry_bps / 1e4 and not state.positions:
+            lo, hi = ("ETH-PERP", "BTC-PERP") if spread < 0 else ("BTC-PERP", "ETH-PERP")
+            n = min(self.max_notional, state.free_collateral * self.max_leverage / 2)
+            yield Order(market=lo, side="long",  size=n / state.mid[lo])
+            yield Order(market=hi, side="short", size=n / state.mid[hi])
+        elif abs(spread) < self.exit_bps / 1e4:
+            yield from self.flatten(state)`,
+    momentum: `        # cross-asset momentum
+        for m in self.markets:
+            r4, r24 = state.ret(m, "4h"), state.ret(m, "24h")
+            if r4 > self.thresh and r24 > 0:
+                yield self.target(state, m, +1)
+            elif r4 < -self.thresh and r24 < 0:
+                yield self.target(state, m, -1)`,
+    meanrev: `        # bollinger mean reversion
+        m = self.markets[0]
+        bb = state.bollinger(m, 20, 2)
+        rsi = state.rsi(m, 14)
+        if state.mid[m] <= bb.lower and rsi < 30:
+            yield self.target(state, m, +1)
+        elif state.mid[m] >= bb.upper and rsi > 70:
+            yield self.target(state, m, -1)
+        elif state.crossed(m, bb.mid):
+            yield from self.flatten(state)`,
+    mm: `        # two-sided passive quoting
+        for m in self.markets:
+            skew = self.inventory_skew(state, m)
+            yield Order(market=m, side="long",  size=self.clip, price=state.bid(m) - self.half_spread + skew, post_only=True)
+            yield Order(market=m, side="short", size=self.clip, price=state.ask(m) + self.half_spread + skew, post_only=True)`,
+    generic: `        # entry/exit derived from your description
+        for m in self.markets:
+            if self.signal(state, m) > 0 and not state.position(m):
+                yield self.target(state, m, +1)
+            elif self.signal(state, m) < 0 and state.position(m).is_long:
+                yield from self.flatten(state, m)`,
+  }[arch];
+
+  return `from decimal import Decimal
+from eigenstrategies_sdk import Strategy, MarketState, Order
+
+class CompiledStrategy(Strategy):
+    """Compiled from natural language. Edit freely — the edited source
+    is what gets hashed and attested in the TEE."""
+    tick_seconds   = 30
+    markets        = ${markets}
+    max_leverage   = Decimal("${params.lev.toFixed(1)}")
+    max_notional   = Decimal("${(params.size * 1000).toFixed(0)}")   # per trade, USDC
+    stop_loss      = Decimal("${(params.stop / 100).toFixed(4)}")    # ${params.stop.toFixed(1)}%
+    entry_bps, exit_bps, thresh = 12, 4, Decimal("0.015")
+
+    def decide(self, state: MarketState):
+${body}
+
+    def target(self, state, market, sign):
+        n = min(self.max_notional, state.free_collateral * self.max_leverage)
+        return Order(market=market, side="long" if sign > 0 else "short",
+                     size=Decimal(n) / state.mid[market], stop_loss=self.stop_loss)
+`;
+}
+
+function markCodeDirty(on) {
+  codeDirty = on;
+  const b = document.getElementById("code-dirty");
+  if (b) b.classList.toggle("hidden", !on);
+}
+
 function setStatus(text, color = "muted") {
   const el = statusEl();
   el.textContent = text;
@@ -52,32 +139,40 @@ function mulberry32(seed) {
   };
 }
 
-function simulateEquity(prose, days) {
-  const seed = seedFrom(prose + ":" + days);
+function detectArchetype(proseLower) {
+  if (/funding|carry|delta-neutral|delta neutral|basis/.test(proseLower)) return "funding";
+  if (/momentum|breakout|trend/.test(proseLower)) return "momentum";
+  if (/mean[- ]?revert|bollinger|rsi/.test(proseLower)) return "meanrev";
+  if (/quote|spread|market.?mak/.test(proseLower)) return "mm";
+  return "generic";
+}
+
+function simulateEquity(prose, days, params = {}) {
+  const lev = params.lev ?? 2, stop = params.stop ?? 2, size = params.size ?? 5;
+  const seed = seedFrom(prose + ":" + days + ":" + lev + ":" + stop + ":" + size);
   const rand = mulberry32(seed);
-  const proseLower = prose.toLowerCase();
+  const arch = detectArchetype(prose.toLowerCase());
 
   // Tilt parameters by detected strategy archetype
-  let drift = 0.0006, vol = 0.012;
-  if (/funding|carry|delta-neutral|delta neutral/.test(proseLower)) { drift = 0.0008; vol = 0.0045; }
-  else if (/momentum|breakout|trend/.test(proseLower)) { drift = 0.0012; vol = 0.018; }
-  else if (/mean[- ]?revert|bollinger|rsi/.test(proseLower)) { drift = 0.0007; vol = 0.014; }
+  let drift = 0.0006, vol = 0.012, turnPerDay = 0.45;
+  if (arch === "funding") { drift = 0.0008; vol = 0.0045; turnPerDay = 0.25; }
+  else if (arch === "momentum") { drift = 0.0012; vol = 0.018; turnPerDay = 0.5; }
+  else if (arch === "meanrev") { drift = 0.0007; vol = 0.014; turnPerDay = 0.85; }
+  else if (arch === "mm") { drift = 0.0006; vol = 0.009; turnPerDay = 1.0; }
 
-  // Add some idiosyncrasy
-  drift *= 0.6 + rand() * 0.9;
-  vol *= 0.7 + rand() * 0.8;
+  // Parameters reshape the curve: leverage scales both edge & risk;
+  // a tighter stop clips vol but shaves a little drift.
+  drift *= (0.6 + rand() * 0.9) * (0.7 + lev * 0.18);
+  vol *= (0.7 + rand() * 0.8) * (0.6 + lev * 0.22) * (0.7 + stop * 0.1);
 
-  const points = days;
   const equity = [1.0];
-  let trades = 0, wins = 0;
-  for (let i = 1; i < points; i++) {
+  let trades = 0, wins = 0, grossNotional = 0;
+  for (let i = 1; i < days; i++) {
     const z = (rand() + rand() + rand() + rand() + rand() + rand() - 3) / 1.7; // ~normal
-    const ret = drift + vol * z;
+    let ret = drift + vol * z;
+    if (ret < -stop / 100) ret = -stop / 100; // stop-loss clip
     equity.push(Math.max(0.05, equity[i - 1] * (1 + ret)));
-    if (rand() < 0.45) {
-      trades += 1;
-      if (ret > 0) wins += 1;
-    }
+    if (rand() < turnPerDay) { trades += 1; grossNotional += size * 1000 * (0.5 + rand()); if (ret > 0) wins += 1; }
   }
 
   const totalReturn = equity[equity.length - 1] - 1;
@@ -92,7 +187,23 @@ function simulateEquity(prose, days) {
     if (dd < mdd) mdd = dd;
   }
   const winRate = trades ? wins / trades : 0;
-  return { equity, totalReturn, sharpe, mdd, winRate, trades };
+  const turnover = trades / days; // round-trips per day
+  return { equity, dailyRets, totalReturn, sharpe, mdd, winRate, trades, turnover, arch };
+}
+
+// Split the run into market regimes (trending up / chop / down) by the
+// rolling slope of equity, and report return contribution in each.
+function regimeBreakdown(equity) {
+  const buckets = { up: 0, chop: 0, down: 0 };
+  const win = 5;
+  for (let i = win; i < equity.length; i++) {
+    const slope = (equity[i] - equity[i - win]) / equity[i - win];
+    const ret = equity[i] / equity[i - 1] - 1;
+    if (slope > 0.01) buckets.up += ret;
+    else if (slope < -0.01) buckets.down += ret;
+    else buckets.chop += ret;
+  }
+  return buckets;
 }
 
 function drawEquity(equity) {
@@ -110,6 +221,8 @@ function drawEquity(equity) {
 }
 
 let lastBacktestSeed = null;
+let lastBacktestResult = null;
+let earnProjectionUpdate = null;
 
 async function runBacktest() {
   const prose = proseEl().value.trim();
@@ -129,7 +242,8 @@ async function runBacktest() {
   document.getElementById("bt-attest").classList.add("hidden");
   await sleep(900);
 
-  const r = simulateEquity(prose, days);
+  const params = readParams();
+  const r = simulateEquity(prose, days, params);
   drawEquity(r.equity);
 
   const today = new Date(2026, 5, 19); // June 19 2026 to match session date
@@ -145,13 +259,73 @@ async function runBacktest() {
   document.getElementById("bt-mdd").textContent = pct(r.mdd);
   document.getElementById("bt-winrate").textContent = `${(r.winRate * 100).toFixed(0)}%`;
   document.getElementById("bt-trades").textContent = String(r.trades);
+
+  // turnover + fee drag (uses a representative 8 bps tx fee)
+  document.getElementById("bt-turnover").textContent = r.turnover.toFixed(2) + "×/d";
+  const feeDrag = r.turnover * 365 * (8 / 10000);
+  document.getElementById("bt-feedrag").textContent = "-" + (feeDrag * 100).toFixed(1) + "%";
+
+  // regime breakdown bars
+  const reg = regimeBreakdown(r.equity);
+  const maxReg = Math.max(0.0001, ...Object.values(reg).map(Math.abs));
+  const regLabels = { up: "Trending", chop: "Chop", down: "Down" };
+  document.getElementById("bt-regime").innerHTML = Object.entries(reg).map(([k, val]) => {
+    const w = Math.round((Math.abs(val) / maxReg) * 100);
+    const col = val >= 0 ? "oklch(var(--primary))" : "oklch(var(--destructive))";
+    return `<div class="flex items-center gap-2 text-xs"><span class="text-muted w-16">${regLabels[k]}</span>
+      <div style="flex:1;height:8px;background:oklch(var(--well));border-radius:999px;overflow:hidden"><div style="height:100%;width:${w}%;background:${col};border-radius:999px"></div></div>
+      <span class="mono w-12 text-right">${pct(val)}</span></div>`;
+  }).join("");
+
+  // walk-forward: in-sample (first 70%) vs out-of-sample (last 30%)
+  const splitIdx = Math.floor(r.equity.length * 0.7);
+  const isRet = r.equity[splitIdx] / r.equity[0] - 1;
+  const oosRet = r.equity[r.equity.length - 1] / r.equity[splitIdx] - 1;
+  // annualize both for comparability
+  const isApr = isRet * (365 / splitIdx);
+  const oosApr = oosRet * (365 / (r.equity.length - splitIdx));
+  document.getElementById("bt-is").textContent = pct(isApr) + " apr";
+  document.getElementById("bt-oos").textContent = pct(oosApr) + " apr";
+  const decay = isApr !== 0 ? oosApr / isApr : 1;
+  const over = document.getElementById("bt-overfit");
+  if (decay > 0.6) { over.textContent = "✓ holds up out-of-sample"; over.style.color = "oklch(var(--primary))"; }
+  else if (decay > 0.2) { over.textContent = "~ some decay out-of-sample"; over.style.color = "oklch(var(--accent))"; }
+  else { over.textContent = "⚠ likely overfit — weak out-of-sample"; over.style.color = "oklch(var(--destructive))"; }
+
+  // sensitivity: perturb stop-loss ±, plot resulting total returns
+  drawSensitivity(prose, days, params);
+
   document.getElementById("bt-attest").classList.remove("hidden");
 
-  lastBacktestSeed = seedFrom(prose);
-  setStatus(`backtest complete · sharpe ${r.sharpe.toFixed(2)}`, "primary");
+  // generated code panel
+  if (!codeDirty) {
+    document.getElementById("code-editor").value = generateCode(prose, params);
+    document.getElementById("code-card").classList.remove("hidden");
+  }
+
+  lastBacktestSeed = seedFrom(prose + JSON.stringify(params));
+  lastBacktestResult = r;
+  if (earnProjectionUpdate) earnProjectionUpdate();
+  setStatus(`backtest complete · sharpe ${r.sharpe.toFixed(2)} · oos ${pct(oosApr)}`, "primary");
 
   btn.disabled = false;
   btn.textContent = "Re-run backtest";
+}
+
+function drawSensitivity(prose, days, params) {
+  const host = document.getElementById("bt-sens");
+  const stops = [-0.6, -0.3, 0, 0.3, 0.6].map((d) => Math.max(0.5, params.stop + d));
+  const rets = stops.map((s) => simulateEquity(prose, days, { ...params, stop: s }).totalReturn);
+  const w = 200, h = 56, min = Math.min(...rets, 0), max = Math.max(...rets, 0.001), span = max - min || 1;
+  const pts = rets.map((v, i) => {
+    const x = (i / (rets.length - 1)) * w;
+    const y = h - ((v - min) / span) * (h - 8) - 4;
+    return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  host.innerHTML = `<svg viewBox="0 0 ${w} ${h}" class="w-full" style="height:${h}px">
+    <path d="${pts}" fill="none" stroke="oklch(0.475 0.095 158)" stroke-width="2"/>
+    ${rets.map((v, i) => `<circle cx="${(i / (rets.length - 1)) * w}" cy="${h - ((v - min) / span) * (h - 8) - 4}" r="2.5" fill="oklch(0.475 0.095 158)"/>`).join("")}
+  </svg>`;
 }
 
 async function deploy() {
@@ -169,6 +343,10 @@ async function deploy() {
   document.getElementById("deploy-btn").disabled = true;
   attCard().classList.add("hidden");
   clearLog();
+  await appendLog(deployMode === "paper"
+    ? "$ deploy mode: PAPER — simulated Lighter sub-account, no real funds"
+    : "$ deploy mode: LIVE — mainnet funds via TEE wallet");
+  if (codeDirty) await appendLog("$ using edited strategy.py from the code panel");
 
   const steps = [
     ["Compiling natural language to Strategy.decide()", 800],
@@ -204,8 +382,9 @@ async function deploy() {
   await appendLog(`✓ ecloud app id: ${appId}`);
   await appendLog(`✓ attestation registry bind: confirmed`);
 
-  setStatus("agent live on EigenCompute", "primary");
+  setStatus(`agent live on EigenCompute · ${deployMode} mode`, "primary");
   editorStatus().textContent = "deployed";
+  if (earnProjectionUpdate) earnProjectionUpdate();
 
   const vaultSection = document.getElementById("vault-section");
   if (vaultSection) {
@@ -228,12 +407,81 @@ function init() {
 
   proseEl().addEventListener("input", () => {
     editorStatus().textContent = "unsaved";
+    markCodeDirty(false); // prose drives a fresh compile on next backtest
   });
 
   document.getElementById("deploy-btn").addEventListener("click", deploy);
   document.getElementById("backtest-btn").addEventListener("click", () => runBacktest());
   document.getElementById("bt-rerun").addEventListener("click", () => runBacktest());
   document.getElementById("bt-window").addEventListener("change", () => runBacktest());
+
+  // parameter sliders: live labels, recompile code on change
+  const sliders = [
+    ["p-lev", "p-lev-val", (v) => v.toFixed(1) + "x"],
+    ["p-size", "p-size-val", (v) => "$" + v + "k"],
+    ["p-stop", "p-stop-val", (v) => v.toFixed(1) + "%"],
+  ];
+  sliders.forEach(([id, labelId, fmt]) => {
+    const s = document.getElementById(id);
+    if (!s) return;
+    s.addEventListener("input", () => {
+      document.getElementById(labelId).textContent = fmt(parseFloat(s.value));
+      markCodeDirty(false);
+      if (!document.getElementById("code-card").classList.contains("hidden")) {
+        document.getElementById("code-editor").value = generateCode(proseEl().value.trim(), readParams());
+      }
+    });
+  });
+
+  // deploy mode toggle
+  const setDeployMode = (m) => {
+    deployMode = m;
+    document.getElementById("mode-paper").setAttribute("aria-pressed", m === "paper");
+    document.getElementById("mode-live").setAttribute("aria-pressed", m === "live");
+  };
+  document.getElementById("mode-paper")?.addEventListener("click", () => setDeployMode("paper"));
+  document.getElementById("mode-live")?.addEventListener("click", () => setDeployMode("live"));
+
+  // editable code panel
+  document.getElementById("code-editor")?.addEventListener("input", () => markCodeDirty(true));
+  document.getElementById("code-recompile")?.addEventListener("click", () => { markCodeDirty(false); runBacktest(); });
+
+  // builder earnings projection
+  const earnTvl = document.getElementById("earn-tvl");
+  if (earnTvl) {
+    const updateEarn = () => {
+      const tvl = parseFloat(earnTvl.value);
+      const usd = (n) => n >= 1e6 ? "$" + (n / 1e6).toFixed(2) + "M" : "$" + Math.round(n / 1e3) + "k";
+      document.getElementById("earn-tvl-val").textContent = usd(tvl);
+      const perfBps = parseFloat(document.querySelectorAll('#vault-section input[type="number"]')[0]?.value || 2000);
+      const txBps = parseFloat(document.querySelectorAll('#vault-section input[type="number"]')[1]?.value || 8);
+      const r = lastBacktestResult || { totalReturn: 0.2, turnover: 0.4 };
+      const perfEarn = Math.max(0, tvl * r.totalReturn) * (perfBps / 10000);
+      const txEarn = tvl * r.turnover * 365 * (txBps / 10000);
+      document.getElementById("earn-perf").textContent = usd(perfEarn) + "/yr";
+      document.getElementById("earn-tx").textContent = usd(txEarn) + "/yr";
+    };
+    earnTvl.addEventListener("input", updateEarn);
+    document.querySelectorAll('#vault-section input[type="number"]').forEach((i) => i.addEventListener("input", updateEarn));
+    earnProjectionUpdate = updateEarn;
+  }
+
+  // fork prefill (?fork=<vault id>)
+  const forkId = new URLSearchParams(location.search).get("fork");
+  if (forkId && window.ES) {
+    const v = ES.byId(forkId);
+    if (v) {
+      proseEl().value = v.prose;
+      editorStatus().textContent = "forked from " + v.name;
+      const banner = document.getElementById("fork-banner");
+      banner.classList.remove("hidden");
+      document.getElementById("fork-text").textContent = `Prefilled from ${v.name} by ${v.builder}. Tweak the description or parameters and re-backtest to make it your own.`;
+      if (document.getElementById("p-lev")) {
+        document.getElementById("p-lev").value = Math.min(5, v.maxLev);
+        document.getElementById("p-lev-val").textContent = Math.min(5, v.maxLev).toFixed(1) + "x";
+      }
+    }
+  }
 
   const cv = createBtn();
   if (cv) cv.addEventListener("click", createVault);
