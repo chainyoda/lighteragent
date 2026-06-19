@@ -224,6 +224,20 @@
           <div class="flex justify-between border-b border-default pb-2"><span class="text-muted">Attestation registry</span><span id="t-reg" class="text-primary mono">BOUND · VALID</span></div>
         </dl>
 
+        <div class="mono text-xs uppercase tracking-[0.12em] text-muted mt-6 mb-3">Lighter market parameters</div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm min-w-[440px]">
+            <thead><tr class="mono text-[0.65rem] uppercase tracking-wider text-muted">
+              <th class="text-left py-1.5 font-medium">Market</th>
+              <th class="text-right py-1.5 font-medium">Max lev</th>
+              <th class="text-right py-1.5 font-medium">Tick</th>
+              <th class="text-right py-1.5 font-medium">Min size</th>
+              <th class="text-right py-1.5 font-medium">IMR / MMR</th>
+            </tr></thead>
+            <tbody id="spec-rows"></tbody>
+          </table>
+        </div>
+
         <div class="mono text-xs uppercase tracking-[0.12em] text-muted mt-6 mb-3">Image history</div>
         <div id="version-list" class="space-y-2"></div>
         <div class="text-sm text-muted mt-5 leading-relaxed">
@@ -323,7 +337,9 @@
       <div class="surface rounded-xl p-6 space-y-3 text-sm">
         <div class="mono text-xs uppercase tracking-wider text-muted mb-2">Fees &amp; builder</div>
         <div class="flex justify-between"><span class="text-muted">Performance fee</span><span id="f-perf" class="mono">—</span></div>
-        <div class="flex justify-between"><span class="text-muted">Per-trade fee</span><span id="f-tx" class="mono">—</span></div>
+        <div class="flex justify-between"><span class="text-muted">Per-trade fee (builder)</span><span id="f-tx" class="mono">—</span></div>
+        <div class="flex justify-between"><span class="text-muted">Lighter venue fee</span><span class="mono">0% / 0%</span></div>
+        <div class="text-[0.7rem] text-muted -mt-1">Standard account · maker / taker · funding hourly</div>
         <div class="flex justify-between border-t border-default pt-2"><span class="text-muted">Fees paid to date</span><span id="f-paid" class="mono">—</span></div>
         <div class="flex items-center justify-between pt-1">
           <span class="text-muted mono uppercase tracking-wider text-xs">Skin in the game</span>

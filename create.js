@@ -477,8 +477,9 @@ function init() {
       banner.classList.remove("hidden");
       document.getElementById("fork-text").textContent = `Prefilled from ${v.name} by ${v.builder}. Tweak the description or parameters and re-backtest to make it your own.`;
       if (document.getElementById("p-lev")) {
-        document.getElementById("p-lev").value = Math.min(5, v.maxLev);
-        document.getElementById("p-lev-val").textContent = Math.min(5, v.maxLev).toFixed(1) + "x";
+        const lev = Math.min(v.maxLevVenue || 50, v.maxLev);
+        document.getElementById("p-lev").value = lev;
+        document.getElementById("p-lev-val").textContent = lev.toFixed(1) + "x";
       }
     }
   }

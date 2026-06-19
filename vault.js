@@ -141,6 +141,23 @@
       vlist.appendChild(row);
     });
 
+    // ---- Lighter market parameters (official venue specs) ---------------
+    const specBody = document.getElementById("spec-rows");
+    if (specBody) {
+      v.markets.forEach((m) => {
+        const s = ES.LIGHTER.markets[m];
+        const tr = document.createElement("tr");
+        tr.className = "border-t border-default";
+        tr.innerHTML = `
+          <td class="py-1.5 mono">${m}</td>
+          <td class="py-1.5 text-right mono">${s.maxLev}×</td>
+          <td class="py-1.5 text-right mono text-muted">${s.tick}</td>
+          <td class="py-1.5 text-right mono text-muted">${s.amountStep}</td>
+          <td class="py-1.5 text-right mono text-muted">${(s.imr * 100).toFixed(1)}% / ${(s.mmr * 100).toFixed(1)}%</td>`;
+        specBody.appendChild(tr);
+      });
+    }
+
     // ---- builder track record ------------------------------------------
     const b = ES.builderProfile(v.builder);
     document.getElementById("b-avatar").textContent = v.builder[0].toUpperCase();

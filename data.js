@@ -26,6 +26,33 @@
     return (rand() + rand() + rand() + rand() + rand() + rand() - 3) / Math.SQRT1_2;
   }
 
+  // ---- Lighter venue parameters (official) ------------------------------
+  // Source: Lighter docs → Perpetual Futures → Contract Specifications & Fees.
+  //   docs.lighter.xyz/perpetual-futures/contract-specifications
+  //   docs.lighter.xyz/trading/trading-fees
+  // tick = price step, amountStep = min size increment, maxLev = max leverage,
+  // imr/mmr/cmr = initial / maintenance / close-out margin requirements.
+  const LIGHTER = {
+    fundingIntervalHours: 1,                       // funding settles hourly
+    fees: {                                         // venue maker/taker fees
+      standard: { makerBps: 0, takerBps: 0 },       // 0% / 0% (default account)
+      premium:  { makerBps: 0.2, takerBps: 2 },     // 0.002% / 0.02% (opt-in HFT)
+    },
+    markets: {
+      "BTC-PERP": { symbol: "BTC", tick: 0.1,   amountStep: 0.00001, maxLev: 50, imr: 0.02, mmr: 0.012, cmr: 0.008, mark: 64200 },
+      "ETH-PERP": { symbol: "ETH", tick: 0.01,  amountStep: 0.0001,  maxLev: 50, imr: 0.02, mmr: 0.012, cmr: 0.008, mark: 3380 },
+      "SOL-PERP": { symbol: "SOL", tick: 0.001, amountStep: 0.001,   maxLev: 25, imr: 0.04, mmr: 0.024, cmr: 0.016, mark: 148 },
+    },
+  };
+  const roundTick = (px, m) => {
+    const t = LIGHTER.markets[m]?.tick || 0.01;
+    return Math.round(px / t) * t;
+  };
+  const roundStep = (sz, m) => {
+    const s = LIGHTER.markets[m]?.amountStep || 0.001;
+    return Math.round(sz / s) * s;
+  };
+
   // ---- archetype tuning -------------------------------------------------
   // annRet / annVol are realistic annualized targets; the path is generated
   // to approximately hit them so Sharpe ≈ annRet/annVol stays believable.
@@ -201,38 +228,42 @@
     const dailyVol = a.annVol / Math.sqrt(365);
     const var95 = +(dailyVol * 1.65 * 100 * (1 + curLev * 0.3)).toFixed(2);
     const worstDay = -+(var95 * (1.3 + rand() * 0.6)).toFixed(2);
-    const liqDist = +((v.maxLev <= 1 ? 80 : 60 / v.maxLev) * (0.8 + rand() * 0.5)).toFixed(1);
     return {
       curLev, netExposure, grossExposure, largestPos, var95, worstDay,
-      liqDist, corrBtc: a.corr,
+      liqDist: 0, corrBtc: a.corr, // liqDist filled from positions in hydrate
     };
   }
 
   // ---- open positions ---------------------------------------------------
+  // Prices snap to each market's Lighter tick, sizes to its amountStep, and
+  // the liquidation price follows from position leverage and the market's
+  // maintenance-margin requirement (MMR): move ≈ 1/lev − MMR.
   function positions(v) {
     const rand = mulberry32(seedFrom(v.id + ":pos"));
-    const px = { "BTC-PERP": 64200, "ETH-PERP": 3380, "SOL-PERP": 148 };
     const out = [];
     for (const m of v.markets) {
+      const spec = LIGHTER.markets[m];
       if (rand() < 0.12 && v.markets.length > 1) continue; // sometimes flat
       const dir = v.archetype === "funding" || v.archetype === "basis"
         ? (out.length % 2 === 0 ? "long" : "short")
         : rand() < 0.55 ? "long" : "short";
-      const mark = px[m] * (1 + (rand() - 0.5) * 0.01);
-      const entry = mark * (1 + (rand() - 0.5) * 0.03);
-      const notional = (v.tvl * (0.1 + rand() * 0.25));
-      const size = notional / mark;
+      const mark = roundTick(spec.mark * (1 + (rand() - 0.5) * 0.01), m);
+      const entry = roundTick(mark * (1 + (rand() - 0.5) * 0.03), m);
+      // per-position leverage tracks the vault's current leverage, capped at
+      // the market's Lighter max; notional follows from the margin slice.
+      const lev = +Math.min(spec.maxLev, Math.max(0.5, v.risk.curLev * (0.6 + rand() * 0.9))).toFixed(1);
+      const margin = v.tvl / Math.max(1, v.markets.length);
+      const notional = margin * lev;
+      const size = roundStep(notional / mark, m);
       const sign = dir === "long" ? 1 : -1;
       const uPnl = sign * (mark - entry) * size;
-      const liqPx = dir === "long" ? mark * (1 - v.risk.liqDist / 100) : mark * (1 + v.risk.liqDist / 100);
-      out.push({
-        market: m, side: dir, size, entry, mark, notional, uPnl, liqPx,
-        lev: +(notional / (v.tvl / Math.max(1, v.markets.length))).toFixed(1),
-      });
+      const move = Math.max(spec.mmr + 0.004, 1 / Math.max(1, lev) - spec.mmr); // dist to liquidation
+      const liqPx = roundTick(dir === "long" ? mark * (1 - move) : mark * (1 + move), m);
+      out.push({ market: m, side: dir, size, entry, mark, notional, uPnl, liqPx, lev, liqDistPct: move * 100 });
     }
     if (out.length === 0) {
-      const m = v.markets[0];
-      out.push({ market: m, side: "long", size: 0.5, entry: px[m], mark: px[m], notional: px[m] * 0.5, uPnl: 0, liqPx: px[m] * 0.6, lev: 1 });
+      const m = v.markets[0], spec = LIGHTER.markets[m];
+      out.push({ market: m, side: "long", size: roundStep(0.5, m), entry: spec.mark, mark: spec.mark, notional: spec.mark * 0.5, uPnl: 0, liqPx: roundTick(spec.mark * 0.6, m), lev: 1, liqDistPct: 40 });
     }
     return out;
   }
@@ -240,15 +271,17 @@
   // ---- recent fills (a rolling tape) ------------------------------------
   function fills(v, n) {
     const rand = mulberry32(seedFrom(v.id + ":fills"));
-    const px = { "BTC-PERP": 64200, "ETH-PERP": 3380, "SOL-PERP": 148 };
     const out = [];
     let t = Date.now();
     for (let i = 0; i < n; i++) {
       const m = v.markets[Math.floor(rand() * v.markets.length)];
+      const spec = LIGHTER.markets[m];
       const side = rand() < 0.5 ? "buy" : "sell";
-      const price = px[m] * (1 + (rand() - 0.5) * 0.004);
+      const price = roundTick(spec.mark * (1 + (rand() - 0.5) * 0.004), m);
       const notional = 2000 + rand() * 28000;
-      const size = notional / price;
+      const size = roundStep(notional / price, m);
+      // venue fee is 0% on Lighter Standard accounts; the only charge is the
+      // vault builder's per-trade fee (txBps).
       const fee = notional * (v.txBps / 10000);
       t -= (8000 + rand() * 90000);
       out.push({ t, market: m, side, price, size, notional, fee });
@@ -333,6 +366,9 @@
     v.apr30 = v.stats.apr; // headline annualized return
     v.risk = risk(v);
     v.positions = positions(v);
+    // liquidation distance = the closest position to its liq price (worst case)
+    v.risk.liqDist = +Math.min(...v.positions.map((p) => p.liqDistPct)).toFixed(1);
+    v.maxLevVenue = Math.min(...v.markets.map((m) => LIGHTER.markets[m].maxLev));
     v.archetypeLabel = ARCHETYPES[v.archetype].label;
   });
 
@@ -361,7 +397,7 @@
   };
 
   window.ES = {
-    VAULTS, ARCHETYPES, byId,
+    VAULTS, ARCHETYPES, LIGHTER, byId, roundTick, roundStep,
     buildSeries, stats, risk, positions, fills, builderProfile, versions, portfolio,
     seedFrom, mulberry32, fmt,
   };
