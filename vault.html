@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Momentum Macro — EigenStrategies</title>
+<title>Vault — EigenStrategies</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Syne:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -33,8 +33,10 @@
   .text-primary { color: oklch(var(--primary)); }
   .text-accent { color: oklch(var(--accent)); }
   .text-muted { color: oklch(var(--muted-foreground)); }
+  .text-destructive { color: oklch(var(--destructive)); }
   .border-default { border-color: oklch(var(--border)); }
   .icon-tile-primary { background: oklch(var(--primary) / 0.1); color: oklch(var(--primary)); }
+  .icon-tile-accent { background: oklch(var(--accent) / 0.12); color: oklch(var(--accent)); }
   .badge {
     display: inline-flex; align-items: center; gap: 0.25rem;
     font-family: "Geist Mono", monospace; font-size: 0.6875rem;
@@ -43,6 +45,12 @@
     text-transform: uppercase; letter-spacing: 0.05em;
   }
   .badge-attested { color: oklch(var(--primary)); border-color: oklch(var(--primary) / 0.3); background: oklch(var(--primary) / 0.08); }
+  .badge-pending { color: oklch(var(--accent)); border-color: oklch(var(--accent) / 0.3); background: oklch(var(--accent) / 0.1); }
+  .tab-active { border-bottom: 2px solid oklch(var(--accent)); }
+  .seg { font-family:"Geist Mono",monospace; font-size:0.7rem; padding:0.25rem 0.6rem; border-radius:0.4rem; cursor:pointer; border:1px solid oklch(var(--border)); color:oklch(var(--muted-foreground)); }
+  .seg[aria-pressed="true"] { background:oklch(var(--primary) / 0.1); color:oklch(var(--primary)); border-color:oklch(var(--primary) / 0.4); }
+  .pulse { animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
 </style>
 </head>
 <body class="min-h-screen">
@@ -59,6 +67,7 @@
     </a>
     <nav class="flex items-center gap-1 text-sm">
       <a href="./index.html" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:oklch(var(--foreground))]">Discover</a>
+      <a href="./portfolio.html" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:oklch(var(--foreground))]">Portfolio</a>
       <a href="./create.html" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:oklch(var(--foreground))]">Build your own agent</a>
     </nav>
     <button data-wallet-btn class="text-sm px-3.5 py-1.5 rounded-md border border-default hover:border-[color:oklch(var(--foreground))] mono">Connect wallet</button>
@@ -68,106 +77,257 @@
 <div class="max-w-6xl mx-auto px-6 py-10">
   <a href="./index.html" class="text-sm text-muted hover:text-[color:oklch(var(--foreground))] mb-6 inline-block mono">← BACK TO VAULTS</a>
 
+  <!-- Hero -->
   <div class="flex items-start gap-5 mb-10">
-    <div class="h-14 w-14 rounded-lg flex items-center justify-center display text-2xl font-semibold icon-tile-primary">M</div>
-    <div>
-      <h1 class="display text-4xl font-semibold flex items-center gap-3 leading-tight">
-        Momentum Macro <span class="badge badge-attested">TEE attested</span>
-      </h1>
-      <div class="text-sm text-muted mono mt-2">0xA1c2…F3e4 · by alpha-lab.eth</div>
-      <p class="mt-4 text-muted max-w-2xl leading-relaxed">Cross-asset perp momentum on BTC/ETH/SOL with 1h/4h/1d signal stack. Risk-parity sizing, 3x max leverage.</p>
+    <div id="v-tile" class="h-14 w-14 rounded-lg flex items-center justify-center display text-2xl font-semibold icon-tile-primary">·</div>
+    <div class="flex-1">
+      <h1 id="v-name" class="display text-4xl font-semibold flex items-center gap-3 leading-tight flex-wrap">Loading…</h1>
+      <div id="v-sub" class="text-sm text-muted mono mt-2"></div>
+      <p id="v-desc" class="mt-4 text-muted max-w-2xl leading-relaxed"></p>
     </div>
+    <a id="v-fork" href="#" class="hidden md:inline-block text-xs mono px-3 py-1.5 rounded-md border border-default hover:border-[color:oklch(var(--foreground))]">FORK THIS STRATEGY →</a>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 space-y-6">
 
+      <!-- Equity chart with live vs backtest overlay -->
       <div class="surface rounded-xl p-6">
-        <div class="flex items-end justify-between mb-5">
+        <div class="flex items-start justify-between mb-4 flex-wrap gap-3">
           <div>
-            <div class="mono text-xs uppercase tracking-wider text-muted">NAV / 60d</div>
-            <div class="display text-3xl font-semibold mt-1">126.3 <span class="text-base text-muted mono font-normal">USDC</span></div>
+            <div class="mono text-xs uppercase tracking-wider text-muted">Net asset value · <span id="eq-window-label">60d</span></div>
+            <div class="display text-3xl font-semibold mt-1"><span id="eq-nav">—</span> <span class="text-base text-muted mono font-normal">/ share</span></div>
           </div>
-          <div class="mono font-semibold text-primary">+38.4% APR</div>
+          <div class="flex flex-col items-end gap-2">
+            <div id="eq-apr" class="mono font-semibold text-primary">—</div>
+            <div class="flex items-center gap-1.5">
+              <button id="tg-backtest" class="seg" aria-pressed="true">Backtest overlay</button>
+              <button id="tg-drawdown" class="seg" aria-pressed="false">Drawdown</button>
+            </div>
+          </div>
         </div>
-        <svg viewBox="0 0 760 140" class="w-full h-36">
-          <defs>
-            <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stop-color="oklch(0.475 0.095 158)" stop-opacity="0.18"/>
-              <stop offset="100%" stop-color="oklch(0.475 0.095 158)" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
-          <path d="M0,100 L40,92 L80,96 L120,80 L160,86 L200,70 L240,78 L280,62 L320,68 L360,50 L400,58 L440,42 L480,52 L520,38 L560,44 L600,32 L640,40 L680,28 L720,34 L760,22 L760,140 L0,140 Z" fill="url(#g)" />
-          <path d="M0,100 L40,92 L80,96 L120,80 L160,86 L200,70 L240,78 L280,62 L320,68 L360,50 L400,58 L440,42 L480,52 L520,38 L560,44 L600,32 L640,40 L680,28 L720,34 L760,22" fill="none" stroke="oklch(0.475 0.095 158)" stroke-width="2"/>
-        </svg>
+        <div id="eq-chart"></div>
+        <div class="flex items-center justify-between mt-3 flex-wrap gap-2">
+          <div class="flex items-center gap-4 text-xs">
+            <span class="flex items-center gap-1.5"><span style="width:14px;height:2px;background:oklch(0.475 0.095 158);display:inline-block"></span> Live</span>
+            <span class="flex items-center gap-1.5"><span style="width:14px;height:0;border-top:2px dashed oklch(0.485 0.008 286);display:inline-block"></span> Backtest</span>
+          </div>
+          <div class="flex items-center gap-1.5" id="eq-windows">
+            <button class="seg" data-win="30" aria-pressed="false">30d</button>
+            <button class="seg" data-win="60" aria-pressed="true">60d</button>
+            <button class="seg" data-win="120" aria-pressed="false">120d</button>
+          </div>
+        </div>
+        <p class="text-xs text-muted mt-3 leading-relaxed">
+          The dashed line is the published backtest; the solid line is what the attested agent actually did live.
+          A small gap is normal (slippage, fees); a large gap means the strategy is not tracking its model.
+          <span class="mono text-[color:oklch(var(--foreground))]">Tracking error: <span id="eq-te">—</span></span>
+        </p>
       </div>
 
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="surface rounded-xl p-5">
-          <div class="mono text-xs uppercase tracking-wider text-muted">TVL</div>
-          <div class="display text-2xl font-semibold mt-1">$2.84M</div>
-        </div>
-        <div class="surface rounded-xl p-5">
-          <div class="mono text-xs uppercase tracking-wider text-muted">Investors</div>
-          <div class="display text-2xl font-semibold mt-1">124</div>
-        </div>
-        <div class="surface rounded-xl p-5">
-          <div class="mono text-xs uppercase tracking-wider text-muted">Perf fee</div>
-          <div class="display text-2xl font-semibold mt-1">20.00%</div>
-        </div>
-        <div class="surface rounded-xl p-5">
-          <div class="mono text-xs uppercase tracking-wider text-muted">Tx fee</div>
-          <div class="display text-2xl font-semibold mt-1">0.08%</div>
-        </div>
+      <!-- Performance + risk metrics -->
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div class="surface rounded-xl p-5"><div class="mono text-xs uppercase tracking-wider text-muted">Total return</div><div id="m-return" class="display text-2xl font-semibold mt-1">—</div></div>
+        <div class="surface rounded-xl p-5"><div class="mono text-xs uppercase tracking-wider text-muted">Sharpe</div><div id="m-sharpe" class="display text-2xl font-semibold mt-1">—</div></div>
+        <div class="surface rounded-xl p-5"><div class="mono text-xs uppercase tracking-wider text-muted">Sortino</div><div id="m-sortino" class="display text-2xl font-semibold mt-1">—</div></div>
+        <div class="surface rounded-xl p-5"><div class="mono text-xs uppercase tracking-wider text-muted">Max drawdown</div><div id="m-mdd" class="display text-2xl font-semibold mt-1 text-destructive">—</div></div>
+        <div class="surface rounded-xl p-5"><div class="mono text-xs uppercase tracking-wider text-muted">Win rate</div><div id="m-win" class="display text-2xl font-semibold mt-1">—</div></div>
+        <div class="surface rounded-xl p-5"><div class="mono text-xs uppercase tracking-wider text-muted">Investors</div><div id="m-inv" class="display text-2xl font-semibold mt-1">—</div></div>
       </div>
 
+      <!-- Risk panel -->
       <div class="surface rounded-xl p-6">
-        <div class="mono text-xs uppercase tracking-[0.12em] text-muted mb-4">Trust & attestation</div>
-        <dl class="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-8 text-sm">
-          <div class="flex justify-between border-b border-default pb-2"><span class="text-muted">EigenCompute image hash</span><span class="mono text-primary">0x7f3c…d10b</span></div>
-          <div class="flex justify-between border-b border-default pb-2"><span class="text-muted">TEE wallet</span><span class="mono">0x9B1c…74d2</span></div>
-          <div class="flex justify-between border-b border-default pb-2"><span class="text-muted">Lighter sub-account</span><span class="mono">vault-0042</span></div>
-          <div class="flex justify-between border-b border-default pb-2"><span class="text-muted">Attestation registry</span><span class="text-primary mono">BOUND · VALID</span></div>
-        </dl>
-        <div class="text-sm text-muted mt-5 leading-relaxed">
-          The vault contract enforces that only the TEE wallet derived from this image hash can route funds to
-          Lighter. To rotate the strategy the builder must call <code class="mono text-[color:oklch(var(--foreground))]">proposeImage</code> and wait for a 24h investor exit window.
+        <div class="flex items-center justify-between mb-5">
+          <div class="mono text-xs uppercase tracking-[0.12em] text-muted">Risk snapshot</div>
+          <div class="mono text-xs text-muted">live · <span class="text-primary">●</span> from Lighter sub-account</div>
         </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-5">
+          <div>
+            <div class="flex justify-between text-sm"><span class="text-muted">Current leverage</span><span id="r-lev" class="mono font-medium">—</span></div>
+            <div id="r-lev-bar"></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-sm"><span class="text-muted">Gross exposure</span><span id="r-gross" class="mono font-medium">—</span></div>
+            <div id="r-gross-bar"></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-sm"><span class="text-muted">Net directional exposure</span><span id="r-net" class="mono font-medium">—</span></div>
+            <div id="r-net-bar"></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-sm"><span class="text-muted">Largest position</span><span id="r-largest" class="mono font-medium">—</span></div>
+            <div id="r-largest-bar"></div>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-5 border-t border-default text-sm">
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">VaR (95%, 1d)</div><div id="r-var" class="display text-lg font-semibold mt-1 text-destructive">—</div></div>
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">Worst day</div><div id="r-worst" class="display text-lg font-semibold mt-1 text-destructive">—</div></div>
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">Liq. distance</div><div id="r-liq" class="display text-lg font-semibold mt-1">—</div></div>
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">BTC correlation</div><div id="r-corr" class="display text-lg font-semibold mt-1">—</div></div>
+        </div>
+        <div class="mt-6 pt-5 border-t border-default">
+          <div class="mono text-xs uppercase tracking-wider text-muted mb-2">Daily return distribution</div>
+          <div id="r-hist"></div>
+        </div>
+      </div>
+
+      <!-- Live positions -->
+      <div class="surface rounded-xl overflow-hidden">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-default">
+          <div class="mono text-xs uppercase tracking-[0.12em] text-muted">Open positions</div>
+          <div class="mono text-xs text-primary flex items-center gap-1.5"><span class="pulse">●</span> live marks</div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm min-w-[560px]">
+            <thead class="well"><tr class="mono text-[0.65rem] uppercase tracking-wider text-muted">
+              <th class="text-left px-6 py-2.5 font-medium">Market</th>
+              <th class="text-left px-3 py-2.5 font-medium">Side</th>
+              <th class="text-right px-3 py-2.5 font-medium">Size</th>
+              <th class="text-right px-3 py-2.5 font-medium">Entry</th>
+              <th class="text-right px-3 py-2.5 font-medium">Mark</th>
+              <th class="text-right px-3 py-2.5 font-medium">uPnL</th>
+              <th class="text-right px-6 py-2.5 font-medium">Liq. px</th>
+            </tr></thead>
+            <tbody id="pos-rows"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Recent fills tape -->
+      <div class="surface rounded-xl overflow-hidden">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-default">
+          <div class="mono text-xs uppercase tracking-[0.12em] text-muted">Recent fills</div>
+          <div class="mono text-xs text-muted">tape · last 24h</div>
+        </div>
+        <div class="overflow-x-auto max-h-72 overflow-y-auto">
+          <table class="w-full text-sm min-w-[520px]">
+            <thead class="well sticky top-0"><tr class="mono text-[0.65rem] uppercase tracking-wider text-muted">
+              <th class="text-left px-6 py-2.5 font-medium">Time</th>
+              <th class="text-left px-3 py-2.5 font-medium">Market</th>
+              <th class="text-left px-3 py-2.5 font-medium">Side</th>
+              <th class="text-right px-3 py-2.5 font-medium">Price</th>
+              <th class="text-right px-3 py-2.5 font-medium">Notional</th>
+              <th class="text-right px-6 py-2.5 font-medium">Fee</th>
+            </tr></thead>
+            <tbody id="fill-rows"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Trust & attestation -->
+      <div class="surface rounded-xl p-6">
+        <div class="mono text-xs uppercase tracking-[0.12em] text-muted mb-4">Trust &amp; attestation</div>
+        <dl class="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-8 text-sm">
+          <div class="flex justify-between border-b border-default pb-2"><span class="text-muted">EigenCompute image hash</span><span id="t-hash" class="mono text-primary">—</span></div>
+          <div class="flex justify-between border-b border-default pb-2"><span class="text-muted">TEE wallet</span><span id="t-wallet" class="mono">—</span></div>
+          <div class="flex justify-between border-b border-default pb-2"><span class="text-muted">Lighter sub-account</span><span id="t-sub" class="mono">—</span></div>
+          <div class="flex justify-between border-b border-default pb-2"><span class="text-muted">Attestation registry</span><span id="t-reg" class="text-primary mono">BOUND · VALID</span></div>
+        </dl>
+
+        <div class="mono text-xs uppercase tracking-[0.12em] text-muted mt-6 mb-3">Image history</div>
+        <div id="version-list" class="space-y-2"></div>
+        <div class="text-sm text-muted mt-5 leading-relaxed">
+          The vault contract enforces that only the TEE wallet derived from the active image hash can route funds to
+          Lighter. To rotate the strategy the builder must call <code class="mono text-[color:oklch(var(--foreground))]">proposeImage</code>, which opens a 24h investor exit window before the new image takes over.
+        </div>
+      </div>
+
+      <!-- Builder track record -->
+      <div class="surface rounded-xl p-6">
+        <div class="mono text-xs uppercase tracking-[0.12em] text-muted mb-4">Builder track record</div>
+        <div class="flex items-center gap-4 mb-5">
+          <div id="b-avatar" class="h-12 w-12 rounded-lg icon-tile-primary flex items-center justify-center display text-lg font-semibold">·</div>
+          <div>
+            <div id="b-ens" class="display text-lg font-semibold">—</div>
+            <div id="b-addr" class="mono text-xs text-muted">—</div>
+          </div>
+          <div class="ml-auto text-right">
+            <div class="mono text-xs uppercase tracking-wider text-muted">On platform</div>
+            <div id="b-joined" class="display text-lg font-semibold">—</div>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-4 text-sm border-t border-default pt-4">
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">Vaults</div><div id="b-vaults" class="display text-lg font-semibold mt-1">—</div></div>
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">Total AUM</div><div id="b-aum" class="display text-lg font-semibold mt-1">—</div></div>
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">Avg APR</div><div id="b-apr" class="display text-lg font-semibold mt-1 text-primary">—</div></div>
+        </div>
+        <div id="b-other" class="mt-4 pt-4 border-t border-default"></div>
       </div>
     </div>
 
+    <!-- Right column -->
     <div class="space-y-4">
+      <!-- Deposit / Redeem -->
       <div class="surface rounded-xl overflow-hidden">
         <div class="flex border-b border-default">
-          <button class="flex-1 py-3.5 text-sm font-medium border-b-2 border-[color:oklch(var(--accent))]">Deposit</button>
-          <button class="flex-1 py-3.5 text-sm font-medium text-muted border-b-2 border-transparent">Redeem</button>
+          <button id="tab-deposit" class="flex-1 py-3.5 text-sm font-medium tab-active">Deposit</button>
+          <button id="tab-redeem" class="flex-1 py-3.5 text-sm font-medium text-muted">Redeem</button>
         </div>
         <div class="p-6 space-y-4">
           <label class="block">
-            <div class="mono text-xs uppercase tracking-wider text-muted mb-1.5">Amount (USDC)</div>
+            <div class="flex justify-between mb-1.5">
+              <span class="mono text-xs uppercase tracking-wider text-muted" id="amt-label">Amount (USDC)</span>
+              <span id="amt-balance" class="mono text-xs text-muted"></span>
+            </div>
             <div class="flex items-center gap-2 border border-default rounded-md px-3 py-2.5 bg-[color:oklch(var(--background))] focus-within:border-[color:oklch(var(--foreground))]">
-              <input value="1000" class="bg-transparent flex-1 outline-none mono text-base" />
-              <span class="text-xs text-muted mono">USDC</span>
+              <input id="amt-input" value="1000" inputmode="decimal" class="bg-transparent flex-1 outline-none mono text-base" />
+              <span id="amt-unit" class="text-xs text-muted mono">USDC</span>
             </div>
           </label>
-          <div class="space-y-2 text-sm">
-            <div class="flex justify-between"><span class="text-muted">You receive</span><span class="mono">7.918 shares</span></div>
-            <div class="flex justify-between"><span class="text-muted">NAV</span><span class="mono">126.3</span></div>
-            <div class="flex justify-between"><span class="text-muted">Slippage tolerance</span><span class="mono">0.10%</span></div>
+
+          <!-- fee-impact calculator -->
+          <div class="well rounded-md p-3 space-y-1.5 text-sm">
+            <div class="flex justify-between"><span class="text-muted">You receive</span><span id="calc-shares" class="mono">—</span></div>
+            <div class="flex justify-between"><span class="text-muted">Share price (NAV)</span><span id="calc-nav" class="mono">—</span></div>
+            <div class="flex justify-between text-xs"><span class="text-muted">Est. perf fee on gains</span><span id="calc-perf" class="mono">—</span></div>
+            <div class="flex justify-between text-xs"><span class="text-muted">Est. tx fee drag / yr</span><span id="calc-tx" class="mono">—</span></div>
+            <div class="flex justify-between border-t border-default pt-1.5 mt-1"><span class="text-muted">Projected value (1y, at current APR)</span><span id="calc-net" class="mono font-semibold">—</span></div>
+            <div class="text-[0.7rem] text-muted leading-snug pt-1">Net of all fees. Projection extrapolates current APR — not a promise.</div>
           </div>
-          <button class="w-full py-3 rounded-md btn-primary text-sm font-medium">Deposit USDC</button>
+
+          <button id="action-btn" class="w-full py-3 rounded-md btn-primary text-sm font-medium">Deposit USDC</button>
+
+          <!-- capacity -->
+          <div>
+            <div class="flex justify-between text-xs mono mb-1"><span class="text-muted">Vault capacity</span><span id="cap-text">—</span></div>
+            <div id="cap-bar"></div>
+            <div id="cap-note" class="text-[0.7rem] text-muted mt-1.5"></div>
+          </div>
         </div>
       </div>
 
-      <div class="surface rounded-xl p-6 space-y-3 text-sm">
-        <div class="mono text-xs uppercase tracking-wider text-muted mb-2">Builder</div>
-        <div class="flex items-center justify-between">
-          <span class="mono">0x9bF1…2c0a</span>
-          <span class="text-muted">alpha-lab.eth</span>
+      <!-- Your position (if connected) -->
+      <div id="your-pos" class="surface rounded-xl p-6 hidden">
+        <div class="mono text-xs uppercase tracking-wider text-muted mb-3">Your position</div>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span class="text-muted">Value</span><span id="yp-value" class="mono font-semibold">—</span></div>
+          <div class="flex justify-between"><span class="text-muted">Cost basis</span><span id="yp-cost" class="mono">—</span></div>
+          <div class="flex justify-between"><span class="text-muted">Unrealized PnL</span><span id="yp-pnl" class="mono">—</span></div>
+          <div class="flex justify-between"><span class="text-muted">Fees paid</span><span id="yp-fees" class="mono">—</span></div>
         </div>
-        <div class="flex items-center justify-between text-xs">
-          <span class="text-muted mono uppercase tracking-wider">Skin in the game</span>
-          <span class="mono font-semibold">12.4%</span>
+      </div>
+
+      <!-- Alerts -->
+      <div class="surface rounded-xl p-6">
+        <div class="mono text-xs uppercase tracking-wider text-muted mb-3">Alerts</div>
+        <p class="text-sm text-muted mb-3 leading-relaxed">Get notified on drawdown breaches, image rotations &amp; redemption windows, and large fills.</p>
+        <div class="space-y-2 text-sm">
+          <label class="flex items-center gap-2"><input type="checkbox" class="cmp-checkbox" data-alert="drawdown" checked> Drawdown &gt; <span class="mono">10%</span></label>
+          <label class="flex items-center gap-2"><input type="checkbox" class="cmp-checkbox" data-alert="rotation" checked> Strategy / image rotation</label>
+          <label class="flex items-center gap-2"><input type="checkbox" class="cmp-checkbox" data-alert="fills"> Fills &gt; <span class="mono">$25k</span></label>
+        </div>
+        <button id="alert-btn" class="w-full mt-4 py-2.5 rounded-md border border-default hover:border-[color:oklch(var(--foreground))] text-sm font-medium">Subscribe to alerts</button>
+      </div>
+
+      <!-- Fees & builder -->
+      <div class="surface rounded-xl p-6 space-y-3 text-sm">
+        <div class="mono text-xs uppercase tracking-wider text-muted mb-2">Fees &amp; builder</div>
+        <div class="flex justify-between"><span class="text-muted">Performance fee</span><span id="f-perf" class="mono">—</span></div>
+        <div class="flex justify-between"><span class="text-muted">Per-trade fee</span><span id="f-tx" class="mono">—</span></div>
+        <div class="flex justify-between border-t border-default pt-2"><span class="text-muted">Fees paid to date</span><span id="f-paid" class="mono">—</span></div>
+        <div class="flex items-center justify-between pt-1">
+          <span class="text-muted mono uppercase tracking-wider text-xs">Skin in the game</span>
+          <span id="f-skin" class="mono font-semibold">—</span>
         </div>
       </div>
     </div>
@@ -176,11 +336,15 @@
 
 <footer class="border-t border-default mt-16">
   <div class="max-w-6xl mx-auto px-6 py-8 text-xs text-muted flex justify-between mono uppercase tracking-wider">
-    <div>EigenStrategies · prototype · all data is mocked</div>
+    <div>EigenStrategies · prototype · testnet — simulated data</div>
     <a href="https://github.com/chainyoda/lighteragent" class="hover:text-[color:oklch(var(--foreground))]">GitHub →</a>
   </div>
 </footer>
 
+<style>.cmp-checkbox{accent-color:oklch(var(--primary));width:0.95rem;height:0.95rem;cursor:pointer}</style>
+<script src="./data.js" defer></script>
+<script src="./ui.js" defer></script>
+<script src="./vault.js" defer></script>
 <script src="./wallet.js" defer></script>
 </body>
 </html>

@@ -32,7 +32,12 @@
   .text-primary { color: oklch(var(--primary)); }
   .text-accent { color: oklch(var(--accent)); }
   .text-muted { color: oklch(var(--muted-foreground)); }
+  .text-destructive { color: oklch(var(--destructive)); }
   .border-default { border-color: oklch(var(--border)); }
+  .seg { font-family:"Geist Mono",monospace; font-size:0.7rem; padding:0.25rem 0.6rem; border-radius:0.4rem; cursor:pointer; border:1px solid oklch(var(--border)); color:oklch(var(--muted-foreground)); }
+  .seg[aria-pressed="true"] { background:oklch(var(--primary) / 0.1); color:oklch(var(--primary)); border-color:oklch(var(--primary) / 0.4); }
+  .badge { display:inline-flex; align-items:center; gap:0.25rem; font-family:"Geist Mono",monospace; font-size:0.6875rem; padding:0.125rem 0.5rem; border-radius:9999px; border:1px solid oklch(var(--border)); background:oklch(var(--card)); text-transform:uppercase; letter-spacing:0.05em; }
+  .badge-attested { color: oklch(var(--primary)); border-color: oklch(var(--primary) / 0.3); background: oklch(var(--primary) / 0.08); }
   .step-num {
     width: 2rem; height: 2rem; border-radius: 9999px;
     background: oklch(var(--primary) / 0.1); color: oklch(var(--primary));
@@ -65,9 +70,14 @@
 <div class="max-w-3xl mx-auto px-6 py-14">
   <div class="mono text-xs uppercase tracking-[0.18em] text-muted mb-3">Builder dashboard</div>
   <h1 class="display text-4xl font-semibold tracking-tight">Build a verifiable trading agent</h1>
-  <p class="text-muted mt-3 mb-10 leading-relaxed">
+  <p class="text-muted mt-3 mb-6 leading-relaxed">
     Describe your strategy in plain English. EigenStrategies compiles it into a verifiable agent and deploys it to EigenCompute. The agent is yours to run — trade your own funds, paper-trade, iterate. Once you're ready, list it as a vault and let outside capital invest.
   </p>
+
+  <div id="fork-banner" class="hidden rounded-md p-4 mb-6 text-sm" style="background:oklch(var(--accent) / 0.08);border:1px solid oklch(var(--accent) / 0.3)">
+    <span class="mono text-xs uppercase tracking-wider text-accent">Forked</span>
+    <span id="fork-text" class="ml-2"></span>
+  </div>
 
   <div class="space-y-5">
 
@@ -94,6 +104,31 @@
         <a href="https://github.com/chainyoda/lighteragent/tree/main/agent-sdk" class="text-accent hover:underline">EigenStrategies SDK</a>'s
         <code class="mono">Strategy.decide()</code> interface and produces a Python module + Dockerfile. Markets supported in v1: BTC-PERP, ETH-PERP, SOL-PERP on Lighter.
       </p>
+
+      <!-- Tunable parameters -->
+      <div class="mt-5 grid grid-cols-1 md:grid-cols-3 gap-5 well rounded-md border border-default p-4">
+        <label class="block">
+          <div class="flex justify-between mono text-xs uppercase tracking-wider text-muted"><span>Max leverage</span><span id="p-lev-val" class="text-[color:oklch(var(--foreground))]">2.0x</span></div>
+          <input id="p-lev" type="range" min="1" max="5" step="0.5" value="2" class="w-full mt-2 accent-[color:oklch(var(--primary))]" />
+        </label>
+        <label class="block">
+          <div class="flex justify-between mono text-xs uppercase tracking-wider text-muted"><span>Max notional / trade</span><span id="p-size-val" class="text-[color:oklch(var(--foreground))]">$5k</span></div>
+          <input id="p-size" type="range" min="1" max="50" step="1" value="5" class="w-full mt-2 accent-[color:oklch(var(--primary))]" />
+        </label>
+        <label class="block">
+          <div class="flex justify-between mono text-xs uppercase tracking-wider text-muted"><span>Stop-loss</span><span id="p-stop-val" class="text-[color:oklch(var(--foreground))]">2.0%</span></div>
+          <input id="p-stop" type="range" min="0.5" max="6" step="0.1" value="2" class="w-full mt-2 accent-[color:oklch(var(--primary))]" />
+        </label>
+      </div>
+
+      <div class="mt-4 flex items-center gap-3 flex-wrap">
+        <span class="mono text-xs uppercase tracking-wider text-muted">Deploy mode</span>
+        <div class="flex items-center gap-1.5">
+          <button id="mode-paper" class="seg" aria-pressed="true">Paper (testnet)</button>
+          <button id="mode-live" class="seg" aria-pressed="false">Live funds</button>
+        </div>
+        <span class="text-xs text-muted">Paper mode trades a simulated sub-account — no real capital at risk.</span>
+      </div>
 
       <div class="mt-5 flex items-center gap-3 flex-wrap">
         <button id="backtest-btn" class="btn-primary px-5 py-2.5 rounded-md text-sm font-medium inline-flex items-center gap-2">
@@ -135,17 +170,53 @@
           <path id="bt-line" d="" fill="none" stroke="oklch(0.475 0.095 158)" stroke-width="2" />
         </svg>
 
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-x-6 gap-y-4 text-sm">
+        <div class="grid grid-cols-2 md:grid-cols-7 gap-x-5 gap-y-4 text-sm">
           <div><div class="mono text-xs uppercase tracking-wider text-muted">Total return</div><div id="bt-return" class="display text-lg font-semibold mt-1">—</div></div>
           <div><div class="mono text-xs uppercase tracking-wider text-muted">Sharpe</div><div id="bt-sharpe" class="display text-lg font-semibold mt-1">—</div></div>
           <div><div class="mono text-xs uppercase tracking-wider text-muted">Max drawdown</div><div id="bt-mdd" class="display text-lg font-semibold mt-1 text-destructive">—</div></div>
           <div><div class="mono text-xs uppercase tracking-wider text-muted">Win rate</div><div id="bt-winrate" class="display text-lg font-semibold mt-1">—</div></div>
           <div><div class="mono text-xs uppercase tracking-wider text-muted">Trades</div><div id="bt-trades" class="display text-lg font-semibold mt-1">—</div></div>
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">Turnover</div><div id="bt-turnover" class="display text-lg font-semibold mt-1">—</div></div>
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">Fee drag</div><div id="bt-feedrag" class="display text-lg font-semibold mt-1 text-destructive">—</div></div>
         </div>
 
-        <div class="mt-4 flex items-center justify-between text-xs">
+        <!-- Regime breakdown + walk-forward + sensitivity -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mt-6 pt-5 border-t border-default">
+          <div>
+            <div class="mono text-xs uppercase tracking-wider text-muted mb-2">Return by regime</div>
+            <div id="bt-regime" class="space-y-1.5"></div>
+          </div>
+          <div>
+            <div class="mono text-xs uppercase tracking-wider text-muted mb-2">Walk-forward</div>
+            <div class="flex justify-between text-sm"><span class="text-muted">In-sample (70%)</span><span id="bt-is" class="mono">—</span></div>
+            <div class="flex justify-between text-sm mt-1"><span class="text-muted">Out-of-sample (30%)</span><span id="bt-oos" class="mono">—</span></div>
+            <div id="bt-overfit" class="text-xs mt-2"></div>
+          </div>
+          <div>
+            <div class="mono text-xs uppercase tracking-wider text-muted mb-2">Param sensitivity</div>
+            <div id="bt-sens"></div>
+            <div class="text-xs text-muted mt-1">Return vs ± stop-loss perturbation. Flat = robust.</div>
+          </div>
+        </div>
+
+        <div class="mt-5 flex items-center justify-between text-xs">
           <span class="text-muted">Backtest runs against historical Lighter data inside an EigenCompute TEE. The image hash signed below is the same one that will trade live.</span>
           <span id="bt-attest" class="badge badge-attested hidden">TEE attested</span>
+        </div>
+      </div>
+
+      <!-- Generated, editable code -->
+      <div id="code-card" class="mt-4 surface rounded-xl overflow-hidden hidden">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-default">
+          <div class="flex items-center gap-3">
+            <div class="mono text-xs uppercase tracking-[0.12em] text-muted">Generated strategy.py</div>
+            <span id="code-dirty" class="badge hidden">edited · recompile to re-test</span>
+          </div>
+          <button id="code-recompile" class="mono text-xs text-accent hover:underline">RECOMPILE &amp; RE-TEST</button>
+        </div>
+        <textarea id="code-editor" spellcheck="false" rows="16" class="w-full px-5 py-4 mono text-xs leading-relaxed bg-transparent outline-none resize-y" style="tab-size:4"></textarea>
+        <div class="px-5 py-2.5 border-t border-default text-xs text-muted">
+          This is the compiled <code class="mono">Strategy.decide()</code> the TEE will run. Edit it directly for full control — the edited source is what gets hashed and attested.
         </div>
       </div>
 
@@ -209,6 +280,19 @@
         <div class="text-sm text-muted">No protocol caps. Investors see your fee schedule prominently.</div>
       </div>
 
+      <div class="surface rounded-xl p-6 space-y-3">
+        <div class="display text-base font-semibold">Your projected earnings</div>
+        <label class="block">
+          <div class="flex justify-between mono text-xs uppercase tracking-wider text-muted"><span>Assumed outside capital</span><span id="earn-tvl-val" class="text-[color:oklch(var(--foreground))]">$1.0M</span></div>
+          <input id="earn-tvl" type="range" min="100000" max="10000000" step="100000" value="1000000" class="w-full mt-2 accent-[color:oklch(var(--primary))]" />
+        </label>
+        <div class="grid grid-cols-2 gap-4 text-sm pt-1">
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">Perf fee / yr</div><div id="earn-perf" class="display text-lg font-semibold mt-1 text-primary">—</div></div>
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">Tx fee / yr</div><div id="earn-tx" class="display text-lg font-semibold mt-1 text-primary">—</div></div>
+        </div>
+        <div class="text-xs text-muted">Estimated from your backtested return &amp; turnover. You earn fees only on outside capital, not your own.</div>
+      </div>
+
       <button id="create-vault-btn" class="w-full py-3.5 rounded-md btn-primary text-sm font-medium">List vault</button>
     </div>
   </div>
@@ -216,12 +300,14 @@
 
 <footer class="border-t border-default mt-16">
   <div class="max-w-6xl mx-auto px-6 py-8 text-xs text-muted flex justify-between mono uppercase tracking-wider">
-    <div>EigenStrategies · prototype · all data is mocked</div>
+    <div>EigenStrategies · prototype · testnet — simulated data</div>
     <a href="https://github.com/chainyoda/lighteragent" class="hover:text-[color:oklch(var(--foreground))]">GitHub →</a>
   </div>
 </footer>
 
-<script src="./wallet.js?v=5" defer></script>
-<script src="./create.js?v=5" defer></script>
+<script src="./data.js?v=6" defer></script>
+<script src="./ui.js?v=6" defer></script>
+<script src="./wallet.js?v=6" defer></script>
+<script src="./create.js?v=6" defer></script>
 </body>
 </html>
