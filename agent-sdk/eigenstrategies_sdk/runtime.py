@@ -23,7 +23,6 @@ from pathlib import Path
 
 from eth_account import Account
 
-from .guardrails import Guardrails
 from .lighter_client import LighterClient, from_env as lighter_from_env
 from .strategy import Strategy
 from .vault_client import VaultClient, from_env as vault_from_env
@@ -32,13 +31,11 @@ from .vault_client import VaultClient, from_env as vault_from_env
 log = logging.getLogger("eigenstrategies.runtime")
 
 
-async def _run(strategy: Strategy, markets: list[str], guardrails: Guardrails | None = None) -> None:
+async def _run(strategy: Strategy, markets: list[str]) -> None:
     lighter = lighter_from_env()
     vault = vault_from_env()
-    guard = guardrails or Guardrails.from_env()
 
     log.info("agent starting: tee_wallet=%s vault=%s", vault.address, os.environ.get("VAULT_ADDRESS"))
-    log.info(guard.describe())
 
     if attestation_path := os.environ.get("ATTESTATION_TOKEN_PATH"):
         token = Path(attestation_path).read_bytes()
@@ -60,11 +57,7 @@ async def _run(strategy: Strategy, markets: list[str], guardrails: Guardrails | 
         while not stopping.is_set():
             try:
                 state = await lighter.fetch_state(markets)
-                # Strategy proposes; guardrails dispose. Every order the
-                # strategy emits is filtered/clamped here, inside the TEE,
-                # so it cannot exceed the vault's published risk limits.
-                proposed = list(strategy.decide(state))
-                orders = guard.apply(proposed, state, log)
+                orders = list(strategy.decide(state))
                 for order in orders:
                     log.info("submit %s %s %s", order.side, order.size, order.market)
                     result = await lighter.submit(order)
@@ -87,15 +80,10 @@ async def _run(strategy: Strategy, markets: list[str], guardrails: Guardrails | 
         log.info("agent stopped")
 
 
-def run_agent(strategy: Strategy, markets: list[str], guardrails: Guardrails | None = None) -> None:
-    """Blocking entrypoint. Call this from your agent's __main__.
-
-    Pass `guardrails` to set limits in code; otherwise they are loaded from the
-    vault's published parameters via `Guardrails.from_env()`. Either way they
-    are enforced by the runtime inside the TEE, not by the strategy.
-    """
+def run_agent(strategy: Strategy, markets: list[str]) -> None:
+    """Blocking entrypoint. Call this from your agent's __main__."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    asyncio.run(_run(strategy, markets, guardrails))
+    asyncio.run(_run(strategy, markets))

@@ -62,7 +62,7 @@ class LighterClient:
             self._mid_prices(markets),
             self._funding_rates(markets),
         )
-        free, account_value = await self._balances()
+        free = await self._free_collateral()
         return MarketState(
             timestamp=int(asyncio.get_event_loop().time()),
             free_collateral=free,
@@ -70,7 +70,6 @@ class LighterClient:
             mid_prices=mids,
             funding_rates=fundings,
             open_orders={},
-            account_value=account_value,
         )
 
     async def submit(self, order: Order) -> dict[str, Any]:
@@ -121,26 +120,15 @@ class LighterClient:
             )
         return out
 
-    async def _balances(self) -> tuple[Decimal, Decimal]:
-        """Returns (free_collateral, account_value).
-
-        free_collateral = collateral - margin locked in positions.
-        account_value   = collateral + unrealized PnL (total equity), the
-        denominator the runtime guardrails use for leverage/drawdown.
-        """
+    async def _free_collateral(self) -> Decimal:
         r = await self._http.get(
             "/api/v1/account",
             params={"by": "index", "value": self.cfg.account_index},
         )
         r.raise_for_status()
-        acct = r.json().get("accounts", [{}])[0]
-        collateral = Decimal(acct.get("collateral", 0))
-        position_margin = Decimal(acct.get("position_margin", 0))
-        upnl = sum(
-            (Decimal(p.get("unrealized_pnl", 0)) for p in acct.get("positions", [])),
-            Decimal(0),
-        )
-        return collateral - position_margin, collateral + upnl
+        body = r.json()
+        acct = body.get("accounts", [{}])[0]
+        return Decimal(acct.get("collateral", 0)) - Decimal(acct.get("position_margin", 0))
 
     async def _mid_prices(self, markets: list[str]) -> dict[str, Decimal]:
         r = await self._http.get("/api/v1/orderBookDetails")
