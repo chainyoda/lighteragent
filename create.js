@@ -1,0 +1,125 @@
+// Mock compile + deploy flow for the Create page.
+// In prod this would: POST prose to a compiler service (LLM-backed,
+// runs in TEE), receive Strategy.py + Dockerfile, push to EigenCompute,
+// return image hash + TEE wallet. Here we simulate the flow with
+// deterministic hashes so the UI feels real.
+
+const EXAMPLES = {
+  funding: `When BTC and ETH funding rates diverge by more than 12 bps over an 8-hour window, go long the lower-funding side and short the higher-funding side, sized in equal notional. Close the pair when the spread compresses below 4 bps. Cap each pair at $5,000 notional. Stay delta-neutral; no leverage.`,
+  momentum: `Run a 1-hour momentum signal on BTC, ETH, and SOL perps. Long markets where the 4-hour return is above +1.5% AND the 24-hour return is positive. Short markets where the 4-hour return is below -1.5% AND the 24-hour return is negative. Risk-parity sizing across positions. Hard stop at -3% per position. Max leverage 2x.`,
+  meanrev: `Watch ETH-PERP on a 5-minute timeframe. Compute Bollinger Bands with a 20-period moving average and 2 standard deviations. When price touches the lower band and RSI is below 30, go long. When price touches the upper band and RSI is above 70, go short. Exit on a return to the moving average. Hard stop at -1.2%.`,
+};
+
+const proseEl = () => document.getElementById("strategy-prose");
+const statusEl = () => document.getElementById("deploy-status");
+const logEl = () => document.getElementById("deploy-log");
+const attCard = () => document.getElementById("attestation-card");
+const createBtn = () => document.getElementById("create-vault-btn");
+const editorStatus = () => document.getElementById("editor-status");
+
+function setStatus(text, color = "muted") {
+  const el = statusEl();
+  el.textContent = text;
+  el.style.color = color === "primary" ? "oklch(var(--primary))"
+    : color === "destructive" ? "oklch(var(--destructive))"
+    : "oklch(var(--muted-foreground))";
+}
+
+async function appendLog(line) {
+  const el = logEl();
+  el.classList.remove("hidden");
+  el.textContent += (el.textContent ? "\n" : "") + line;
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() {
+  const el = logEl();
+  el.textContent = "";
+  el.classList.add("hidden");
+}
+
+async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function deploy() {
+  const prose = proseEl().value.trim();
+  if (prose.length < 40) {
+    setStatus("describe the strategy in more detail (40+ chars)", "destructive");
+    return;
+  }
+
+  document.getElementById("deploy-btn").disabled = true;
+  attCard().classList.add("hidden");
+  clearLog();
+
+  const steps = [
+    ["Compiling natural language to Strategy.decide()", 800],
+    ["Generated strategy.py (137 lines)", 400],
+    ["Generated Dockerfile (linux/amd64, python:3.12-slim)", 300],
+    ["Pushing image to EigenCompute registry", 1100],
+    ["Building inside TEE", 1400],
+    ["Provisioning KMS wallet", 700],
+    ["Issuing attestation token", 600],
+    ["Binding attestation onchain", 900],
+  ];
+
+  for (const [label, ms] of steps) {
+    setStatus(label + "…", "primary");
+    await appendLog(`$ ${label.toLowerCase()}`);
+    await sleep(ms);
+  }
+
+  // Deterministic-ish mock outputs derived from the prose.
+  const seed = Array.from(prose).reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const hex = (n, len) => n.toString(16).padStart(len, "0");
+  const imageHash = "0x" + hex(seed, 8) + "9b18e4a2cd771f3c0e88d10b".slice(0, 56);
+  const teeWallet = "0x" + hex(seed ^ 0xdeadbeef, 8) + "1c5704d29bb8".slice(0, 32);
+  const appId = "ev-" + hex(seed, 8).slice(0, 6);
+
+  document.getElementById("out-image-hash").textContent = imageHash.slice(0, 14) + "…" + imageHash.slice(-6);
+  document.getElementById("out-tee-wallet").textContent = teeWallet.slice(0, 10) + "…" + teeWallet.slice(-6);
+  document.getElementById("out-app-id").textContent = appId;
+  attCard().classList.remove("hidden");
+
+  await appendLog(`✓ image hash: ${imageHash}`);
+  await appendLog(`✓ tee wallet: ${teeWallet}`);
+  await appendLog(`✓ ecloud app id: ${appId}`);
+  await appendLog(`✓ attestation registry bind: confirmed`);
+
+  setStatus("agent live on EigenCompute", "primary");
+  editorStatus().textContent = "deployed";
+
+  const btn = createBtn();
+  btn.disabled = false;
+  btn.classList.remove("opacity-50", "cursor-not-allowed");
+  btn.textContent = "Create vault for this agent";
+
+  document.getElementById("deploy-btn").disabled = false;
+  document.getElementById("deploy-btn").textContent = "Re-deploy";
+}
+
+function init() {
+  document.querySelectorAll(".example-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const k = btn.dataset.example;
+      proseEl().value = EXAMPLES[k] || "";
+      editorStatus().textContent = "loaded example";
+    });
+  });
+
+  proseEl().addEventListener("input", () => {
+    editorStatus().textContent = "unsaved";
+  });
+
+  document.getElementById("deploy-btn").addEventListener("click", deploy);
+
+  createBtn().addEventListener("click", () => {
+    if (createBtn().disabled) return;
+    alert("VaultFactory.createVault tx submitted (mock)");
+  });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}

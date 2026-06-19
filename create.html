@@ -66,8 +66,8 @@
   <div class="mono text-xs uppercase tracking-[0.18em] text-muted mb-3">Builder dashboard</div>
   <h1 class="display text-4xl font-semibold tracking-tight">Create a vault</h1>
   <p class="text-muted mt-3 mb-10 leading-relaxed">
-    Deploy your strategy to EigenCompute first, then paste the attested image hash and TEE wallet here. The factory
-    deploys an ERC-4626 vault and binds it in the attestation registry.
+    Describe your trading strategy in plain English. EigenVaults compiles it into a verifiable agent, deploys it to
+    EigenCompute, and binds the attested image hash to a fresh ERC-4626 vault — automatically.
   </p>
 
   <div class="space-y-5">
@@ -75,42 +75,48 @@
     <div class="surface rounded-xl p-6">
       <div class="flex items-center gap-3 mb-4">
         <div class="step-num">01</div>
-        <div class="display text-lg font-semibold">Write your strategy</div>
+        <div class="display text-lg font-semibold">Describe your agent</div>
+        <div class="ml-auto flex gap-2">
+          <button data-example="funding" class="example-btn text-xs mono px-2.5 py-1 rounded-md border border-default hover:border-[color:oklch(var(--foreground))]">FUNDING-CARRY</button>
+          <button data-example="momentum" class="example-btn text-xs mono px-2.5 py-1 rounded-md border border-default hover:border-[color:oklch(var(--foreground))]">MOMENTUM</button>
+          <button data-example="meanrev" class="example-btn text-xs mono px-2.5 py-1 rounded-md border border-default hover:border-[color:oklch(var(--foreground))]">MEAN-REVERT</button>
+        </div>
       </div>
-      <p class="text-sm text-muted mb-3">Subclass <code class="mono">Strategy</code> from the EigenVaults SDK. Return the orders you want this tick.</p>
-      <div class="well rounded-md p-4 mono text-xs border border-default leading-relaxed overflow-x-auto">
-<span class="text-muted"># strategy.py</span>
-<span class="text-primary">from</span> eigenvaults_sdk <span class="text-primary">import</span> Strategy, Order, run_agent
 
-<span class="text-primary">class</span> <span class="text-accent">MyStrategy</span>(Strategy):
-    <span class="text-primary">def</span> <span class="text-accent">decide</span>(<span class="text-primary">self</span>, state):
-        <span class="text-primary">if not</span> state.positions:
-            <span class="text-primary">yield</span> Order(market=<span class="text-accent">"BTC-PERP"</span>, side=<span class="text-accent">"long"</span>, size=<span class="text-accent">0.001</span>)
+      <div class="well rounded-md border border-default overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-2 border-b border-default text-xs mono text-muted">
+          <span>strategy.txt</span>
+          <span id="editor-status">unsaved</span>
+        </div>
+        <textarea id="strategy-prose" placeholder="e.g. When BTC and ETH funding rates diverge by more than 12 bps over 8 hours, go long the lower-funding side and short the higher-funding side, in equal notional. Close when the spread compresses below 4 bps. Cap each pair at $5,000 notional. Run delta-neutral; no leverage." spellcheck="true" class="w-full px-4 py-4 text-sm leading-relaxed bg-transparent outline-none resize-y" rows="8"></textarea>
+      </div>
 
-run_agent(MyStrategy(), markets=[<span class="text-accent">"BTC-PERP"</span>])
-      </div>
-      <div class="mt-3 flex gap-3 text-xs">
-        <a href="https://github.com/chainyoda/lighteragent/tree/main/agent-sdk" class="mono text-accent hover:underline">SDK DOCS →</a>
-        <a href="https://github.com/chainyoda/lighteragent/tree/main/agents/funding-carry" class="mono text-accent hover:underline">REFERENCE AGENT →</a>
-      </div>
-    </div>
+      <p class="text-xs text-muted mt-3">
+        The compiler maps your description onto the
+        <a href="https://github.com/chainyoda/lighteragent/tree/main/agent-sdk" class="text-accent hover:underline">EigenVaults SDK</a>'s
+        <code class="mono">Strategy.decide()</code> interface and produces a Python module + Dockerfile. Builders can edit the generated code before deploying. Markets supported in v1: BTC-PERP, ETH-PERP, SOL-PERP on Lighter.
+      </p>
 
-    <div class="surface rounded-xl p-6">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="step-num">02</div>
-        <div class="display text-lg font-semibold">Deploy to EigenCompute</div>
+      <div class="mt-4 flex items-center gap-3">
+        <button id="deploy-btn" class="btn-primary px-5 py-2.5 rounded-md text-sm font-medium">Compile & deploy to EigenCompute</button>
+        <span id="deploy-status" class="text-sm text-muted mono"></span>
       </div>
-      <div class="well rounded-md p-4 mono text-sm border border-default">
-        <div class="text-muted"># in your strategy repo</div>
-        <div>$ ecloud compute app deploy</div>
-        <div class="text-primary mt-1">→ image hash: <span class="text-accent">0x7f3c9b…d10b</span></div>
-        <div class="text-primary">→ tee wallet: <span class="text-accent">0x9B1c…74d2</span></div>
+
+      <div id="deploy-log" class="mt-4 well rounded-md p-4 mono text-xs border border-default leading-relaxed hidden whitespace-pre-wrap"></div>
+
+      <div id="attestation-card" class="mt-4 rounded-md border border-default p-4 hidden" style="background: oklch(var(--primary) / 0.06)">
+        <div class="text-xs mono uppercase tracking-wider text-primary mb-2">Attestation bound</div>
+        <dl class="text-sm space-y-1.5">
+          <div class="flex justify-between gap-4"><span class="text-muted">Image hash</span><span id="out-image-hash" class="mono"></span></div>
+          <div class="flex justify-between gap-4"><span class="text-muted">TEE wallet</span><span id="out-tee-wallet" class="mono"></span></div>
+          <div class="flex justify-between gap-4"><span class="text-muted">EigenCompute app</span><span id="out-app-id" class="mono"></span></div>
+        </dl>
       </div>
     </div>
 
     <div class="surface rounded-xl p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <div class="step-num">03</div>
+        <div class="step-num">02</div>
         <div class="display text-lg font-semibold">Vault metadata</div>
       </div>
       <label class="block">
@@ -125,22 +131,7 @@ run_agent(MyStrategy(), markets=[<span class="text-accent">"BTC-PERP"</span>])
 
     <div class="surface rounded-xl p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <div class="step-num">04</div>
-        <div class="display text-lg font-semibold">Attestation binding</div>
-      </div>
-      <label class="block">
-        <div class="mono text-xs uppercase tracking-wider text-muted mb-1.5">EigenCompute image hash</div>
-        <input placeholder="0x…" class="w-full border border-default rounded-md px-3 py-2.5 outline-none focus:border-[color:oklch(var(--foreground))] mono" />
-      </label>
-      <label class="block">
-        <div class="mono text-xs uppercase tracking-wider text-muted mb-1.5">TEE wallet (KMS-derived)</div>
-        <input placeholder="0x…" class="w-full border border-default rounded-md px-3 py-2.5 outline-none focus:border-[color:oklch(var(--foreground))] mono" />
-      </label>
-    </div>
-
-    <div class="surface rounded-xl p-6 space-y-4">
-      <div class="flex items-center gap-3">
-        <div class="step-num">05</div>
+        <div class="step-num">03</div>
         <div class="display text-lg font-semibold">Fees</div>
       </div>
       <div class="grid grid-cols-2 gap-4">
@@ -158,7 +149,7 @@ run_agent(MyStrategy(), markets=[<span class="text-accent">"BTC-PERP"</span>])
       <div class="text-sm text-muted">No protocol caps. Investors see your fee schedule prominently.</div>
     </div>
 
-    <button class="w-full py-3.5 rounded-md btn-primary text-sm font-medium">Deploy vault</button>
+    <button id="create-vault-btn" disabled class="w-full py-3.5 rounded-md btn-primary text-sm font-medium opacity-50 cursor-not-allowed">Deploy your agent first to create the vault</button>
   </div>
 </div>
 
@@ -170,5 +161,6 @@ run_agent(MyStrategy(), markets=[<span class="text-accent">"BTC-PERP"</span>])
 </footer>
 
 <script src="./wallet.js" defer></script>
+<script src="./create.js" defer></script>
 </body>
 </html>
