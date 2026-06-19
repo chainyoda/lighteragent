@@ -7,7 +7,7 @@
     if (!window.ES || !window.UI) return setTimeout(start, 30);
     const { fmt } = ES;
     const params = new URLSearchParams(location.search);
-    const v = ES.byId(params.get("id")) || ES.VAULTS[0];
+    const v = ES.byId(params.get("id") || params.get("addr")) || ES.VAULTS[0];
     const a = ES.ARCHETYPES[v.archetype];
     document.title = `${v.name} — EigenStrategies`;
 

@@ -600,7 +600,46 @@ async function createVault() {
   await appendLog(`✓ tx: ${txHash.slice(0, 22)}…`);
   await appendLog(`✓ attestation bound · valid`);
 
+  // Persist the created vault so the vault page / discover can render it.
+  const prose = proseEl().value.trim();
+  const params = readParams();
+  const desc = document.querySelector('#vault-section textarea')?.value?.trim() || prose.slice(0, 160);
+  persistCreatedVault({
+    addr: vaultAddr,
+    name,
+    prose,
+    desc,
+    archetype: detectArchetype(prose.toLowerCase()),
+    markets: marketsFromProse(prose),
+    maxLev: params.lev,
+    perfBps: parseInt(perfFee, 10) || 2000,
+    txBps: parseInt(txFee, 10) || 8,
+    imageHash,
+    teeWallet,
+    builder: stored?.address ? `${stored.address.slice(0, 6)}…${stored.address.slice(-4)}` : "you.eth",
+    builderAddr: stored?.address,
+    createdAt: Date.now(),
+  });
+
   showSuccessCard({ name, vaultAddr, txHash });
+}
+
+function marketsFromProse(p) {
+  p = (p || "").toLowerCase();
+  if (/\bsol\b|solana/.test(p)) return ["BTC-PERP", "ETH-PERP", "SOL-PERP"];
+  if (/\beth\b|ethereum/.test(p) && !/\bbtc\b|bitcoin/.test(p)) return ["ETH-PERP"];
+  return ["BTC-PERP", "ETH-PERP"];
+}
+
+function persistCreatedVault(rec) {
+  try {
+    const key = "eigenstrategies:vaults";
+    const all = JSON.parse(localStorage.getItem(key) || "{}");
+    all[rec.addr] = rec;
+    localStorage.setItem(key, JSON.stringify(all));
+  } catch (e) {
+    console.warn("[create] could not persist vault", e);
+  }
 }
 
 function showSuccessCard({ name, vaultAddr, txHash }) {

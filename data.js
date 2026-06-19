@@ -291,8 +291,12 @@
 
   // ---- builders ---------------------------------------------------------
   function builderProfile(ens) {
-    const mine = VAULTS.filter((v) => v.builder === ens);
+    const mine = VAULTS.concat(loadCustomVaults()).filter((v) => v.builder === ens);
     const rand = mulberry32(seedFrom(ens + ":bld"));
+    if (mine.length === 0) {
+      // unknown builder (e.g. a freshly created vault's wallet): safe defaults
+      return { ens, addr: "0x" + "0".repeat(40), vaults: [], vaultCount: 1, totalAum: 0, avgApr: 0, joinedDays: 1, verified: true };
+    }
     const totalAum = mine.reduce((s, v) => s + v.tvl, 0);
     const avgApr = mine.reduce((s, v) => s + v.stats.apr, 0) / mine.length;
     const oldest = Math.max(...mine.map((v) => v.ageDays));
@@ -358,8 +362,8 @@
     return { positions, totalValue, totalCost, totalPnl: totalValue - totalCost, feesPaid };
   }
 
-  // ---- hydrate every vault once ----------------------------------------
-  VAULTS.forEach((v) => {
+  // ---- hydrate (derive all series/stats/risk/guardrails for one vault) --
+  function hydrate(v) {
     v.series60 = buildSeries(v, 60);          // short window for sparkline + histogram
     v.seriesStat = buildSeries(v, 365);       // long window for stable headline stats
     v.stats = stats(v.seriesStat);
@@ -368,10 +372,9 @@
     v.positions = positions(v);
     // liquidation distance = the closest position to its liq price (worst case)
     v.risk.liqDist = +Math.min(...v.positions.map((p) => p.liqDistPct)).toFixed(1);
-    v.maxLevVenue = Math.min(...v.markets.map((m) => LIGHTER.markets[m].maxLev));
+    v.maxLevVenue = Math.min(...v.markets.map((m) => (LIGHTER.markets[m] || { maxLev: 50 }).maxLev));
     v.archetypeLabel = ARCHETYPES[v.archetype].label;
     // Published guardrails — enforced in the TEE runtime (see guardrails.py).
-    // Mirrors the GUARD_* limits the runtime loads from the vault's params.
     const grossCap = v.tvl * v.maxLev;
     const ddBase = Math.abs(v.stats.mdd) + 0.05;
     v.guardrails = {
@@ -385,9 +388,59 @@
       maxDrawdownPct: Math.min(0.5, Math.max(0.08, Math.ceil((ddBase * 100) / 5) * 5 / 100)),
       maxOrdersPerTick: ARCHETYPES[v.archetype].turn === "high" ? 40 : 20,
     };
-  });
+    return v;
+  }
+  VAULTS.forEach(hydrate);
 
-  function byId(id) { return VAULTS.find((v) => v.id === id); }
+  // Build a fully-hydrated vault from a partial spec (used for builder-created
+  // vaults persisted in localStorage). Fills sane defaults for anything the
+  // create flow didn't capture.
+  const ARCHETYPE_ALIAS = { mm: "market_making", generic: "momentum", trend: "trend" };
+  function makeVault(spec) {
+    spec = spec || {};
+    let archetype = spec.archetype || "momentum";
+    archetype = ARCHETYPE_ALIAS[archetype] || archetype;
+    if (!ARCHETYPES[archetype]) archetype = "momentum";
+    const markets = (spec.markets && spec.markets.length ? spec.markets : ["BTC-PERP", "ETH-PERP"])
+      .filter((m) => LIGHTER.markets[m]);
+    const id = spec.id || spec.addr || ("custom-" + (seedFrom(spec.name || "vault") % 99999));
+    const name = spec.name || "New Vault";
+    const tvl = spec.tvl || 25000;
+    const v = {
+      id, addr: spec.addr || id, custom: true,
+      name, letter: (name.trim()[0] || "V").toUpperCase(),
+      builder: spec.builder || "you.eth",
+      builderAddr: spec.builderAddr || ("0x" + (seedFrom(id) >>> 0).toString(16).padStart(40, "0")).slice(0, 42),
+      archetype, markets: markets.length ? markets : ["BTC-PERP", "ETH-PERP"],
+      maxLev: spec.maxLev || 2,
+      tvl, investors: spec.investors || 1,
+      perfBps: spec.perfBps || 2000, txBps: spec.txBps || 8,
+      ageDays: spec.ageDays || 1,
+      capacity: spec.capacity || Math.max(tvl * 20, 1_000_000),
+      skin: spec.skin != null ? spec.skin : 100,
+      attested: spec.attested !== false,
+      desc: spec.desc || (spec.prose ? spec.prose.slice(0, 160) : "Builder-created agent."),
+      prose: spec.prose || "",
+      imageHash: spec.imageHash, teeWallet: spec.teeWallet, createdAt: spec.createdAt,
+    };
+    return hydrate(v);
+  }
+
+  // Builder-created vaults persisted by the create flow.
+  function loadCustomVaults() {
+    try {
+      if (typeof localStorage === "undefined") return [];
+      const raw = localStorage.getItem("eigenstrategies:vaults");
+      if (!raw) return [];
+      return Object.values(JSON.parse(raw)).map(makeVault);
+    } catch { return []; }
+  }
+
+  function byId(id) {
+    if (!id) return undefined;
+    return VAULTS.find((v) => v.id === id)
+      || loadCustomVaults().find((v) => v.id === id || v.addr === id);
+  }
 
   // ---- formatting helpers (shared by all pages) -------------------------
   const fmt = {
@@ -414,6 +467,7 @@
   window.ES = {
     VAULTS, ARCHETYPES, LIGHTER, byId, roundTick, roundStep,
     buildSeries, stats, risk, positions, fills, builderProfile, versions, portfolio,
+    hydrate, makeVault, loadCustomVaults,
     seedFrom, mulberry32, fmt,
   };
 })();
