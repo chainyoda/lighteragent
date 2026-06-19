@@ -4,198 +4,249 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>EigenVaults — agent-traded ERC-4626 on Lighter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Syne:wght@500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  :root { color-scheme: dark; }
-  html, body { background:#0a0a0a; color:#e5e5e5; }
-  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .grid-bg {
-    background-image:
-      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
+  :root {
+    --background: oklch(0.928 0.016 106);
+    --foreground: oklch(0.255 0.012 122);
+    --card: oklch(0.976 0.009 106);
+    --muted: oklch(0.905 0.014 105);
+    --muted-foreground: oklch(0.485 0.008 286);
+    --primary: oklch(0.475 0.095 158);
+    --primary-foreground: oklch(0.985 0.008 106);
+    --accent: oklch(0.75 0.185 45);
+    --accent-foreground: oklch(0.99 0.006 70);
+    --border: oklch(0.853 0.013 104);
+    --success: oklch(0.475 0.095 158);
+    --destructive: oklch(0.53 0.19 28);
   }
-  .glow { box-shadow: 0 0 0 1px rgba(99,102,241,0.25), 0 0 40px -10px rgba(99,102,241,0.4); }
+  html, body { background: var(--background); color: var(--foreground); font-family: "Geist", system-ui, sans-serif; }
+  .display { font-family: "Syne", "Geist", sans-serif; letter-spacing: -0.02em; }
+  .mono { font-family: "Geist Mono", ui-monospace, monospace; }
+  .surface { background: var(--card); border: 1px solid var(--border); }
+  .well { background: oklch(0.96 0.012 106); }
+  .btn-primary { background: var(--primary); color: var(--primary-foreground); }
+  .btn-primary:hover { background: oklch(0.42 0.095 158); }
+  .text-primary { color: var(--primary); }
+  .text-accent { color: var(--accent); }
+  .text-muted { color: var(--muted-foreground); }
+  .border-default { border-color: var(--border); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    font-family: "Geist Mono", monospace; font-size: 0.6875rem;
+    padding: 0.125rem 0.5rem; border-radius: 9999px;
+    border: 1px solid var(--border); background: var(--card);
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .badge-attested { color: var(--primary); border-color: oklch(0.475 0.095 158 / 0.3); background: oklch(0.475 0.095 158 / 0.06); }
+  .badge-pending { color: var(--accent); border-color: oklch(0.75 0.185 45 / 0.3); background: oklch(0.75 0.185 45 / 0.08); }
+  .row-link { display: contents; }
+  .topo {
+    background-image:
+      radial-gradient(circle at 20% 30%, oklch(0.475 0.095 158 / 0.04) 0, transparent 35%),
+      radial-gradient(circle at 80% 60%, oklch(0.75 0.185 45 / 0.05) 0, transparent 40%);
+  }
+  .underline-accent { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 3px; text-underline-offset: 6px; }
 </style>
 </head>
 <body class="min-h-screen">
 
-<!-- nav -->
-<header class="border-b border-white/5 bg-black/40 backdrop-blur sticky top-0 z-20">
-  <div class="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
-    <a href="./index.html" class="flex items-center gap-2">
-      <svg width="28" height="28" viewBox="0 0 32 32">
-        <path d="M16 2 L29 9 V23 L16 30 L3 23 V9 Z" fill="none" stroke="#818cf8" stroke-width="1.5" />
-        <path d="M16 8 L24 12 V20 L16 24 L8 20 V12 Z" fill="#818cf8" opacity="0.25" />
-        <circle cx="16" cy="16" r="2.5" fill="#818cf8" />
+<header class="border-b border-default">
+  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="./index.html" class="flex items-center gap-2.5">
+      <svg width="26" height="26" viewBox="0 0 32 32">
+        <path d="M16 2 L29 9 V23 L16 30 L3 23 V9 Z" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <path d="M16 8 L24 12 V20 L16 24 L8 20 V12 Z" fill="currentColor" opacity="0.15" />
+        <circle cx="16" cy="16" r="2.5" fill="currentColor" />
       </svg>
-      <span class="font-semibold tracking-tight">EigenVaults</span>
+      <span class="display text-lg font-semibold">EigenVaults</span>
     </a>
-    <nav class="flex items-center gap-1">
-      <a href="./index.html" class="px-3 py-1.5 text-sm rounded-md bg-white/10 text-white">Discover</a>
-      <a href="./create.html" class="px-3 py-1.5 text-sm rounded-md text-neutral-400 hover:text-white">Create vault</a>
-      <a href="https://github.com/chainyoda/lighteragent" class="px-3 py-1.5 text-sm rounded-md text-neutral-400 hover:text-white">Docs</a>
+    <nav class="flex items-center gap-1 text-sm">
+      <a href="./index.html" class="px-3 py-1.5 rounded-md font-medium">Discover</a>
+      <a href="./create.html" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:var(--foreground)]">Create vault</a>
+      <a href="https://github.com/chainyoda/lighteragent" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:var(--foreground)]">Docs</a>
     </nav>
-    <button class="text-sm px-3 py-1.5 rounded-md border border-white/10 hover:border-white/30">Connect wallet</button>
+    <button class="text-sm px-3.5 py-1.5 rounded-md border border-default hover:border-[color:var(--foreground)] mono">Connect wallet</button>
   </div>
 </header>
 
-<!-- hero -->
-<div class="grid-bg border-b border-white/5">
-  <div class="max-w-6xl mx-auto px-5 py-16">
-    <div class="text-xs uppercase tracking-widest text-indigo-300/80 mb-3">Eigen reference app</div>
-    <h1 class="text-4xl md:text-5xl font-semibold tracking-tight max-w-3xl">
+<section class="topo border-b border-default">
+  <div class="max-w-6xl mx-auto px-6 py-20">
+    <div class="mono text-xs uppercase tracking-[0.18em] text-muted mb-6">An Eigen Labs Project</div>
+    <h1 class="display text-5xl md:text-6xl font-semibold leading-[1.05] max-w-4xl">
       Trading agents, attested in a TEE,<br />
-      <span class="text-indigo-300">funded by anyone.</span>
+      <span class="underline-accent">funded by anyone.</span>
     </h1>
-    <p class="text-neutral-400 mt-4 max-w-2xl">
+    <p class="text-lg text-muted mt-6 max-w-2xl leading-relaxed">
       Builders deploy a strategy to EigenCompute. Investors deposit USDC into an ERC-4626 vault that pins the
       attested image hash. The same algorithm trades for everyone on Lighter perps.
     </p>
-    <div class="mt-7 flex gap-3">
-      <a href="#vaults" class="px-4 py-2 rounded-md bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium glow">Browse vaults</a>
-      <a href="https://github.com/chainyoda/lighteragent" class="px-4 py-2 rounded-md border border-white/15 hover:border-white/30 text-sm">Read the architecture</a>
+    <div class="mt-9 flex gap-3">
+      <a href="#vaults" class="btn-primary px-5 py-2.5 rounded-md text-sm font-medium">Browse vaults</a>
+      <a href="https://github.com/chainyoda/lighteragent" class="px-5 py-2.5 rounded-md border border-default hover:border-[color:var(--foreground)] text-sm font-medium">Read the architecture →</a>
     </div>
-    <div class="mt-10 grid grid-cols-3 max-w-xl gap-6">
-      <div><div class="text-xs text-neutral-500 uppercase tracking-wider">Total TVL</div><div class="text-2xl font-semibold mono mt-0.5">$9.78M</div></div>
-      <div><div class="text-xs text-neutral-500 uppercase tracking-wider">Active vaults</div><div class="text-2xl font-semibold mono mt-0.5">5</div></div>
-      <div><div class="text-xs text-neutral-500 uppercase tracking-wider">Investors</div><div class="text-2xl font-semibold mono mt-0.5">558</div></div>
+
+    <div class="mt-14 grid grid-cols-3 max-w-2xl gap-10">
+      <div>
+        <div class="mono text-xs uppercase tracking-wider text-muted">Total TVL</div>
+        <div class="display text-3xl font-semibold mt-1">$9.78M</div>
+      </div>
+      <div>
+        <div class="mono text-xs uppercase tracking-wider text-muted">Active vaults</div>
+        <div class="display text-3xl font-semibold mt-1">5</div>
+      </div>
+      <div>
+        <div class="mono text-xs uppercase tracking-wider text-muted">Investors</div>
+        <div class="display text-3xl font-semibold mt-1">558</div>
+      </div>
     </div>
   </div>
-</div>
+</section>
 
-<!-- vault list -->
-<div id="vaults" class="max-w-6xl mx-auto px-5 py-10">
-  <div class="flex items-end justify-between mb-5">
+<section id="vaults" class="max-w-6xl mx-auto px-6 py-14">
+  <div class="flex items-end justify-between mb-6">
     <div>
-      <div class="text-xs text-neutral-500 uppercase tracking-wider">All vaults</div>
-      <h2 class="text-xl font-semibold">Discover</h2>
+      <div class="mono text-xs uppercase tracking-wider text-muted">All vaults</div>
+      <h2 class="display text-2xl font-semibold mt-1">Frontier Strategies</h2>
     </div>
+    <div class="text-sm text-muted">Sorted by 30d APR</div>
   </div>
 
-  <div class="rounded-xl border border-white/5 overflow-hidden">
+  <div class="surface rounded-xl overflow-hidden">
     <table class="w-full text-sm">
-      <thead class="bg-white/[0.02] text-neutral-500 text-xs uppercase tracking-wider">
-        <tr>
-          <th class="text-left px-4 py-3 font-normal">Vault</th>
-          <th class="text-right px-4 py-3 font-normal">TVL</th>
-          <th class="text-right px-4 py-3 font-normal">30d APR</th>
-          <th class="text-right px-4 py-3 font-normal">Perf / Tx fee</th>
-          <th class="text-right px-4 py-3 font-normal">Age</th>
-          <th class="text-right px-4 py-3 font-normal"></th>
+      <thead class="well border-b border-default">
+        <tr class="mono text-[0.7rem] uppercase tracking-[0.12em] text-muted">
+          <th class="text-left px-5 py-3 font-medium">Vault</th>
+          <th class="text-right px-5 py-3 font-medium">TVL</th>
+          <th class="text-right px-5 py-3 font-medium">30d APR</th>
+          <th class="text-right px-5 py-3 font-medium">Perf / Tx fee</th>
+          <th class="text-right px-5 py-3 font-medium">Age</th>
+          <th class="text-right px-5 py-3 font-medium"></th>
         </tr>
       </thead>
-      <tbody>
+      <tbody class="bg-[color:var(--card)]">
 
-        <tr class="border-t border-white/5 hover:bg-white/[0.03]">
-          <td class="px-4 py-3">
-            <a href="./vault.html?id=momentum" class="flex items-center gap-3">
-              <div class="h-8 w-8 rounded-md bg-gradient-to-br from-indigo-500/30 to-fuchsia-500/30 border border-white/10 flex items-center justify-center text-xs">M</div>
+        <tr class="border-t border-default hover:bg-[color:oklch(0.96_0.012_106)] transition">
+          <td class="px-5 py-4">
+            <a href="./vault.html?id=momentum" class="flex items-center gap-3.5">
+              <div class="h-9 w-9 rounded-md flex items-center justify-center display font-semibold" style="background:oklch(0.475 0.095 158 / 0.1); color:var(--primary)">M</div>
               <div>
-                <div class="font-medium flex items-center gap-2">
-                  Momentum Macro
-                  <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">TEE attested</span>
-                </div>
-                <div class="text-xs text-neutral-500 mono">by alpha-lab.eth</div>
+                <div class="font-medium flex items-center gap-2">Momentum Macro <span class="badge badge-attested">TEE attested</span></div>
+                <div class="text-xs text-muted mono">by alpha-lab.eth</div>
               </div>
             </a>
           </td>
-          <td class="px-4 py-3 text-right mono">$2.84M</td>
-          <td class="px-4 py-3 text-right mono text-emerald-400">+38.4%</td>
-          <td class="px-4 py-3 text-right mono text-neutral-300">20.00% / 0.08%</td>
-          <td class="px-4 py-3 text-right text-neutral-400">71d</td>
-          <td class="px-4 py-3 text-right"><a href="./vault.html?id=momentum" class="text-indigo-300 text-xs">View →</a></td>
+          <td class="px-5 py-4 text-right mono">$2.84M</td>
+          <td class="px-5 py-4 text-right mono text-primary font-semibold">+38.4%</td>
+          <td class="px-5 py-4 text-right mono text-muted">20.00% / 0.08%</td>
+          <td class="px-5 py-4 text-right text-muted mono">71d</td>
+          <td class="px-5 py-4 text-right"><a href="./vault.html?id=momentum" class="text-accent text-xs font-medium mono">VIEW →</a></td>
         </tr>
 
-        <tr class="border-t border-white/5 hover:bg-white/[0.03]">
-          <td class="px-4 py-3">
-            <a href="./vault.html?id=funding" class="flex items-center gap-3">
-              <div class="h-8 w-8 rounded-md bg-gradient-to-br from-indigo-500/30 to-fuchsia-500/30 border border-white/10 flex items-center justify-center text-xs">F</div>
+        <tr class="border-t border-default hover:bg-[color:oklch(0.96_0.012_106)] transition">
+          <td class="px-5 py-4">
+            <a href="./vault.html?id=funding" class="flex items-center gap-3.5">
+              <div class="h-9 w-9 rounded-md flex items-center justify-center display font-semibold" style="background:oklch(0.475 0.095 158 / 0.1); color:var(--primary)">F</div>
               <div>
-                <div class="font-medium flex items-center gap-2">
-                  Funding Harvester
-                  <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">TEE attested</span>
-                </div>
-                <div class="text-xs text-neutral-500 mono">by fundingcat.eth</div>
+                <div class="font-medium flex items-center gap-2">Funding Harvester <span class="badge badge-attested">TEE attested</span></div>
+                <div class="text-xs text-muted mono">by fundingcat.eth</div>
               </div>
             </a>
           </td>
-          <td class="px-4 py-3 text-right mono">$1.21M</td>
-          <td class="px-4 py-3 text-right mono text-emerald-400">+22.1%</td>
-          <td class="px-4 py-3 text-right mono text-neutral-300">15.00% / 0.05%</td>
-          <td class="px-4 py-3 text-right text-neutral-400">42d</td>
-          <td class="px-4 py-3 text-right"><a href="./vault.html?id=funding" class="text-indigo-300 text-xs">View →</a></td>
+          <td class="px-5 py-4 text-right mono">$1.21M</td>
+          <td class="px-5 py-4 text-right mono text-primary font-semibold">+22.1%</td>
+          <td class="px-5 py-4 text-right mono text-muted">15.00% / 0.05%</td>
+          <td class="px-5 py-4 text-right text-muted mono">42d</td>
+          <td class="px-5 py-4 text-right"><a href="./vault.html?id=funding" class="text-accent text-xs font-medium mono">VIEW →</a></td>
         </tr>
 
-        <tr class="border-t border-white/5 hover:bg-white/[0.03]">
-          <td class="px-4 py-3">
-            <a href="./vault.html?id=meanrev" class="flex items-center gap-3">
-              <div class="h-8 w-8 rounded-md bg-gradient-to-br from-indigo-500/30 to-fuchsia-500/30 border border-white/10 flex items-center justify-center text-xs">M</div>
+        <tr class="border-t border-default hover:bg-[color:oklch(0.96_0.012_106)] transition">
+          <td class="px-5 py-4">
+            <a href="./vault.html?id=meanrev" class="flex items-center gap-3.5">
+              <div class="h-9 w-9 rounded-md flex items-center justify-center display font-semibold" style="background:oklch(0.475 0.095 158 / 0.1); color:var(--primary)">R</div>
               <div>
-                <div class="font-medium flex items-center gap-2">
-                  Mean Reversion 5m
-                  <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">TEE attested</span>
-                </div>
-                <div class="text-xs text-neutral-500 mono">by meanrev.eth</div>
+                <div class="font-medium flex items-center gap-2">Mean Reversion 5m <span class="badge badge-attested">TEE attested</span></div>
+                <div class="text-xs text-muted mono">by meanrev.eth</div>
               </div>
             </a>
           </td>
-          <td class="px-4 py-3 text-right mono">$412k</td>
-          <td class="px-4 py-3 text-right mono text-emerald-400">+14.6%</td>
-          <td class="px-4 py-3 text-right mono text-neutral-300">10.00% / 0.12%</td>
-          <td class="px-4 py-3 text-right text-neutral-400">19d</td>
-          <td class="px-4 py-3 text-right"><a href="./vault.html?id=meanrev" class="text-indigo-300 text-xs">View →</a></td>
+          <td class="px-5 py-4 text-right mono">$412k</td>
+          <td class="px-5 py-4 text-right mono text-primary font-semibold">+14.6%</td>
+          <td class="px-5 py-4 text-right mono text-muted">10.00% / 0.12%</td>
+          <td class="px-5 py-4 text-right text-muted mono">19d</td>
+          <td class="px-5 py-4 text-right"><a href="./vault.html?id=meanrev" class="text-accent text-xs font-medium mono">VIEW →</a></td>
         </tr>
 
-        <tr class="border-t border-white/5 hover:bg-white/[0.03]">
-          <td class="px-4 py-3">
-            <a href="./vault.html?id=stable" class="flex items-center gap-3">
-              <div class="h-8 w-8 rounded-md bg-gradient-to-br from-indigo-500/30 to-fuchsia-500/30 border border-white/10 flex items-center justify-center text-xs">Y</div>
+        <tr class="border-t border-default hover:bg-[color:oklch(0.96_0.012_106)] transition">
+          <td class="px-5 py-4">
+            <a href="./vault.html?id=stable" class="flex items-center gap-3.5">
+              <div class="h-9 w-9 rounded-md flex items-center justify-center display font-semibold" style="background:oklch(0.475 0.095 158 / 0.1); color:var(--primary)">Y</div>
               <div>
-                <div class="font-medium flex items-center gap-2">
-                  Yield-Stable LP
-                  <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">TEE attested</span>
-                </div>
-                <div class="text-xs text-neutral-500 mono">by stable.eth</div>
+                <div class="font-medium flex items-center gap-2">Yield-Stable LP <span class="badge badge-attested">TEE attested</span></div>
+                <div class="text-xs text-muted mono">by stable.eth</div>
               </div>
             </a>
           </td>
-          <td class="px-4 py-3 text-right mono">$5.12M</td>
-          <td class="px-4 py-3 text-right mono text-emerald-400">+13.2%</td>
-          <td class="px-4 py-3 text-right mono text-neutral-300">10.00% / 0.04%</td>
-          <td class="px-4 py-3 text-right text-neutral-400">118d</td>
-          <td class="px-4 py-3 text-right"><a href="./vault.html?id=stable" class="text-indigo-300 text-xs">View →</a></td>
+          <td class="px-5 py-4 text-right mono">$5.12M</td>
+          <td class="px-5 py-4 text-right mono text-primary font-semibold">+13.2%</td>
+          <td class="px-5 py-4 text-right mono text-muted">10.00% / 0.04%</td>
+          <td class="px-5 py-4 text-right text-muted mono">118d</td>
+          <td class="px-5 py-4 text-right"><a href="./vault.html?id=stable" class="text-accent text-xs font-medium mono">VIEW →</a></td>
         </tr>
 
-        <tr class="border-t border-white/5 hover:bg-white/[0.03]">
-          <td class="px-4 py-3">
-            <a href="./vault.html?id=breakout" class="flex items-center gap-3">
-              <div class="h-8 w-8 rounded-md bg-gradient-to-br from-indigo-500/30 to-fuchsia-500/30 border border-white/10 flex items-center justify-center text-xs">B</div>
+        <tr class="border-t border-default hover:bg-[color:oklch(0.96_0.012_106)] transition">
+          <td class="px-5 py-4">
+            <a href="./vault.html?id=breakout" class="flex items-center gap-3.5">
+              <div class="h-9 w-9 rounded-md flex items-center justify-center display font-semibold" style="background:oklch(0.75 0.185 45 / 0.12); color:var(--accent)">B</div>
               <div>
-                <div class="font-medium flex items-center gap-2">
-                  Breakout Hunter
-                  <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">attestation pending</span>
-                </div>
-                <div class="text-xs text-neutral-500 mono">by breakout.eth</div>
+                <div class="font-medium flex items-center gap-2">Breakout Hunter <span class="badge badge-pending">attestation pending</span></div>
+                <div class="text-xs text-muted mono">by breakout.eth</div>
               </div>
             </a>
           </td>
-          <td class="px-4 py-3 text-right mono">$198k</td>
-          <td class="px-4 py-3 text-right mono text-rose-400">-4.7%</td>
-          <td class="px-4 py-3 text-right mono text-neutral-300">25.00% / 0.10%</td>
-          <td class="px-4 py-3 text-right text-neutral-400">11d</td>
-          <td class="px-4 py-3 text-right"><a href="./vault.html?id=breakout" class="text-indigo-300 text-xs">View →</a></td>
+          <td class="px-5 py-4 text-right mono">$198k</td>
+          <td class="px-5 py-4 text-right mono font-semibold" style="color:var(--destructive)">-4.7%</td>
+          <td class="px-5 py-4 text-right mono text-muted">25.00% / 0.10%</td>
+          <td class="px-5 py-4 text-right text-muted mono">11d</td>
+          <td class="px-5 py-4 text-right"><a href="./vault.html?id=breakout" class="text-accent text-xs font-medium mono">VIEW →</a></td>
         </tr>
 
       </tbody>
     </table>
   </div>
-</div>
+</section>
 
-<footer class="border-t border-white/5 mt-16">
-  <div class="max-w-6xl mx-auto px-5 py-6 text-xs text-neutral-500 flex justify-between">
+<section class="border-t border-default">
+  <div class="max-w-6xl mx-auto px-6 py-16">
+    <div class="mono text-xs uppercase tracking-[0.18em] text-muted mb-3">How it works</div>
+    <h2 class="display text-3xl md:text-4xl font-semibold max-w-3xl mb-12">Three moving parts. One trust anchor.</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div class="surface rounded-xl p-6">
+        <div class="mono text-xs text-accent mb-2">01 / CUSTODY</div>
+        <div class="display text-xl font-semibold mb-2">ERC-4626 vault</div>
+        <p class="text-sm text-muted leading-relaxed">USDC sits onchain. Investors mint shares; redemptions clear from free balance or pull from Lighter.</p>
+      </div>
+      <div class="surface rounded-xl p-6">
+        <div class="mono text-xs text-accent mb-2">02 / EXECUTION</div>
+        <div class="display text-xl font-semibold mb-2">EigenCompute TEE</div>
+        <p class="text-sm text-muted leading-relaxed">Strategy runs in an attested container. KMS-derived wallet is the only key with trade authority.</p>
+      </div>
+      <div class="surface rounded-xl p-6">
+        <div class="mono text-xs text-accent mb-2">03 / SETTLEMENT</div>
+        <div class="display text-xl font-semibold mb-2">Lighter sub-account</div>
+        <p class="text-sm text-muted leading-relaxed">Each vault owns one Lighter sub-account. PnL flows back through the bridge to the vault.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="border-t border-default">
+  <div class="max-w-6xl mx-auto px-6 py-8 text-xs text-muted flex justify-between mono uppercase tracking-wider">
     <div>EigenVaults · prototype · all data is mocked</div>
-    <a href="https://github.com/chainyoda/lighteragent" class="hover:text-neutral-300">GitHub →</a>
+    <a href="https://github.com/chainyoda/lighteragent" class="hover:text-[color:var(--foreground)]">GitHub →</a>
   </div>
 </footer>
 

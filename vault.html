@@ -3,120 +3,178 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Vault — EigenVaults</title>
+<title>Momentum Macro — EigenVaults</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Syne:wght@500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  :root { color-scheme: dark; }
-  html, body { background:#0a0a0a; color:#e5e5e5; }
-  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .glow { box-shadow: 0 0 0 1px rgba(99,102,241,0.25), 0 0 40px -10px rgba(99,102,241,0.4); }
+  :root {
+    --background: oklch(0.928 0.016 106);
+    --foreground: oklch(0.255 0.012 122);
+    --card: oklch(0.976 0.009 106);
+    --muted: oklch(0.905 0.014 105);
+    --muted-foreground: oklch(0.485 0.008 286);
+    --primary: oklch(0.475 0.095 158);
+    --primary-foreground: oklch(0.985 0.008 106);
+    --accent: oklch(0.75 0.185 45);
+    --border: oklch(0.853 0.013 104);
+    --destructive: oklch(0.53 0.19 28);
+  }
+  html, body { background: var(--background); color: var(--foreground); font-family: "Geist", system-ui, sans-serif; }
+  .display { font-family: "Syne", "Geist", sans-serif; letter-spacing: -0.02em; }
+  .mono { font-family: "Geist Mono", ui-monospace, monospace; }
+  .surface { background: var(--card); border: 1px solid var(--border); }
+  .well { background: oklch(0.96 0.012 106); }
+  .btn-primary { background: var(--primary); color: var(--primary-foreground); }
+  .btn-primary:hover { background: oklch(0.42 0.095 158); }
+  .text-primary { color: var(--primary); }
+  .text-accent { color: var(--accent); }
+  .text-muted { color: var(--muted-foreground); }
+  .border-default { border-color: var(--border); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    font-family: "Geist Mono", monospace; font-size: 0.6875rem;
+    padding: 0.125rem 0.5rem; border-radius: 9999px;
+    border: 1px solid var(--border); background: var(--card);
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .badge-attested { color: var(--primary); border-color: oklch(0.475 0.095 158 / 0.3); background: oklch(0.475 0.095 158 / 0.06); }
 </style>
 </head>
 <body class="min-h-screen">
 
-<header class="border-b border-white/5 bg-black/40 backdrop-blur sticky top-0 z-20">
-  <div class="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
-    <a href="./index.html" class="flex items-center gap-2">
-      <svg width="28" height="28" viewBox="0 0 32 32">
-        <path d="M16 2 L29 9 V23 L16 30 L3 23 V9 Z" fill="none" stroke="#818cf8" stroke-width="1.5" />
-        <path d="M16 8 L24 12 V20 L16 24 L8 20 V12 Z" fill="#818cf8" opacity="0.25" />
-        <circle cx="16" cy="16" r="2.5" fill="#818cf8" />
+<header class="border-b border-default">
+  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="./index.html" class="flex items-center gap-2.5">
+      <svg width="26" height="26" viewBox="0 0 32 32">
+        <path d="M16 2 L29 9 V23 L16 30 L3 23 V9 Z" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <path d="M16 8 L24 12 V20 L16 24 L8 20 V12 Z" fill="currentColor" opacity="0.15" />
+        <circle cx="16" cy="16" r="2.5" fill="currentColor" />
       </svg>
-      <span class="font-semibold tracking-tight">EigenVaults</span>
+      <span class="display text-lg font-semibold">EigenVaults</span>
     </a>
-    <nav class="flex items-center gap-1">
-      <a href="./index.html" class="px-3 py-1.5 text-sm rounded-md text-neutral-400 hover:text-white">Discover</a>
-      <a href="./create.html" class="px-3 py-1.5 text-sm rounded-md text-neutral-400 hover:text-white">Create vault</a>
+    <nav class="flex items-center gap-1 text-sm">
+      <a href="./index.html" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:var(--foreground)]">Discover</a>
+      <a href="./create.html" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:var(--foreground)]">Create vault</a>
     </nav>
-    <button class="text-sm px-3 py-1.5 rounded-md border border-white/10 hover:border-white/30">Connect wallet</button>
+    <button class="text-sm px-3.5 py-1.5 rounded-md border border-default hover:border-[color:var(--foreground)] mono">Connect wallet</button>
   </div>
 </header>
 
-<div class="max-w-6xl mx-auto px-5 py-8">
-  <a href="./index.html" class="text-sm text-neutral-400 hover:text-white mb-4 inline-block">← Back to vaults</a>
+<div class="max-w-6xl mx-auto px-6 py-10">
+  <a href="./index.html" class="text-sm text-muted hover:text-[color:var(--foreground)] mb-6 inline-block mono">← BACK TO VAULTS</a>
 
-  <div class="flex items-start gap-4 mb-6">
-    <div class="h-12 w-12 rounded-lg bg-gradient-to-br from-indigo-500/30 to-fuchsia-500/30 border border-white/10 flex items-center justify-center text-lg">M</div>
+  <div class="flex items-start gap-5 mb-10">
+    <div class="h-14 w-14 rounded-lg flex items-center justify-center display text-2xl font-semibold" style="background:oklch(0.475 0.095 158 / 0.1); color:var(--primary)">M</div>
     <div>
-      <h1 class="text-2xl font-semibold flex items-center gap-3">
-        Momentum Macro
-        <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">TEE attested</span>
+      <h1 class="display text-4xl font-semibold flex items-center gap-3 leading-tight">
+        Momentum Macro <span class="badge badge-attested">TEE attested</span>
       </h1>
-      <div class="text-sm text-neutral-400 mono">0xA1c2…F3e4 · by alpha-lab.eth</div>
-      <p class="mt-3 text-neutral-300 max-w-2xl">Cross-asset perp momentum on BTC/ETH/SOL with 1h/4h/1d signal stack. Risk-parity sizing, 3x max leverage.</p>
+      <div class="text-sm text-muted mono mt-2">0xA1c2…F3e4 · by alpha-lab.eth</div>
+      <p class="mt-4 text-muted max-w-2xl leading-relaxed">Cross-asset perp momentum on BTC/ETH/SOL with 1h/4h/1d signal stack. Risk-parity sizing, 3x max leverage.</p>
     </div>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 space-y-6">
 
-      <div class="rounded-xl border border-white/5 p-5">
-        <div class="flex items-end justify-between mb-4">
+      <div class="surface rounded-xl p-6">
+        <div class="flex items-end justify-between mb-5">
           <div>
-            <div class="text-xs text-neutral-500 uppercase tracking-wider">NAV (60d)</div>
-            <div class="text-2xl font-semibold mono">126.3 USDC</div>
+            <div class="mono text-xs uppercase tracking-wider text-muted">NAV / 60d</div>
+            <div class="display text-3xl font-semibold mt-1">126.3 <span class="text-base text-muted mono font-normal">USDC</span></div>
           </div>
-          <div class="text-sm mono text-emerald-400">+38.4% APR</div>
+          <div class="mono font-semibold text-primary">+38.4% APR</div>
         </div>
-          <svg viewBox="0 0 760 120" class="w-full h-32">
-            <path d="M0,90 L40,82 L80,86 L120,70 L160,76 L200,60 L240,68 L280,52 L320,58 L360,40 L400,48 L440,32 L480,42 L520,28 L560,34 L600,22 L640,30 L680,18 L720,24 L760,12" fill="none" stroke="#34d399" stroke-width="1.8" />
-          </svg>
+        <svg viewBox="0 0 760 140" class="w-full h-36">
+          <defs>
+            <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="oklch(0.475 0.095 158)" stop-opacity="0.18"/>
+              <stop offset="100%" stop-color="oklch(0.475 0.095 158)" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M0,100 L40,92 L80,96 L120,80 L160,86 L200,70 L240,78 L280,62 L320,68 L360,50 L400,58 L440,42 L480,52 L520,38 L560,44 L600,32 L640,40 L680,28 L720,34 L760,22 L760,140 L0,140 Z" fill="url(#g)" />
+          <path d="M0,100 L40,92 L80,96 L120,80 L160,86 L200,70 L240,78 L280,62 L320,68 L360,50 L400,58 L440,42 L480,52 L520,38 L560,44 L600,32 L640,40 L680,28 L720,34 L760,22" fill="none" stroke="oklch(0.475 0.095 158)" stroke-width="2"/>
+        </svg>
       </div>
 
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div><div class="text-xs text-neutral-500 uppercase tracking-wider">TVL</div><div class="text-xl font-semibold mono mt-0.5">$2.84M</div></div>
-        <div><div class="text-xs text-neutral-500 uppercase tracking-wider">Investors</div><div class="text-xl font-semibold mono mt-0.5">124</div></div>
-        <div><div class="text-xs text-neutral-500 uppercase tracking-wider">Perf fee</div><div class="text-xl font-semibold mono mt-0.5">20.00%</div></div>
-        <div><div class="text-xs text-neutral-500 uppercase tracking-wider">Tx fee</div><div class="text-xl font-semibold mono mt-0.5">0.08%</div></div>
+        <div class="surface rounded-xl p-5">
+          <div class="mono text-xs uppercase tracking-wider text-muted">TVL</div>
+          <div class="display text-2xl font-semibold mt-1">$2.84M</div>
+        </div>
+        <div class="surface rounded-xl p-5">
+          <div class="mono text-xs uppercase tracking-wider text-muted">Investors</div>
+          <div class="display text-2xl font-semibold mt-1">124</div>
+        </div>
+        <div class="surface rounded-xl p-5">
+          <div class="mono text-xs uppercase tracking-wider text-muted">Perf fee</div>
+          <div class="display text-2xl font-semibold mt-1">20.00%</div>
+        </div>
+        <div class="surface rounded-xl p-5">
+          <div class="mono text-xs uppercase tracking-wider text-muted">Tx fee</div>
+          <div class="display text-2xl font-semibold mt-1">0.08%</div>
+        </div>
       </div>
 
-      <div class="rounded-xl border border-white/5 p-5">
-        <div class="text-xs text-neutral-500 uppercase tracking-wider mb-3">Trust & attestation</div>
-        <dl class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          <div class="flex justify-between"><span class="text-neutral-500">EigenCompute image hash</span><span class="mono text-indigo-300">0x7f3c…d10b</span></div>
-          <div class="flex justify-between"><span class="text-neutral-500">TEE wallet</span><span class="mono">0x9B1c…74d2</span></div>
-          <div class="flex justify-between"><span class="text-neutral-500">Lighter sub-account</span><span class="mono">vault-0042</span></div>
-          <div class="flex justify-between"><span class="text-neutral-500">Attestation registry</span><span class="text-emerald-300">bound · valid</span></div>
+      <div class="surface rounded-xl p-6">
+        <div class="mono text-xs uppercase tracking-[0.12em] text-muted mb-4">Trust & attestation</div>
+        <dl class="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-8 text-sm">
+          <div class="flex justify-between border-b border-default pb-2"><span class="text-muted">EigenCompute image hash</span><span class="mono text-primary">0x7f3c…d10b</span></div>
+          <div class="flex justify-between border-b border-default pb-2"><span class="text-muted">TEE wallet</span><span class="mono">0x9B1c…74d2</span></div>
+          <div class="flex justify-between border-b border-default pb-2"><span class="text-muted">Lighter sub-account</span><span class="mono">vault-0042</span></div>
+          <div class="flex justify-between border-b border-default pb-2"><span class="text-muted">Attestation registry</span><span class="text-primary mono">BOUND · VALID</span></div>
         </dl>
-        <div class="text-xs text-neutral-500 mt-3 leading-relaxed">
+        <div class="text-sm text-muted mt-5 leading-relaxed">
           The vault contract enforces that only the TEE wallet derived from this image hash can route funds to
-          Lighter. To rotate the strategy the builder must call <code class="text-neutral-300">proposeImage</code> and
-          wait for a 24h investor exit window.
+          Lighter. To rotate the strategy the builder must call <code class="mono text-[color:var(--foreground)]">proposeImage</code> and wait for a 24h investor exit window.
         </div>
       </div>
     </div>
 
     <div class="space-y-4">
-      <div class="rounded-xl border border-white/5 overflow-hidden">
-        <div class="flex">
-          <button class="flex-1 py-3 text-sm font-medium bg-white/[0.04] text-white border-b border-indigo-400">Deposit</button>
-          <button class="flex-1 py-3 text-sm font-medium text-neutral-400">Redeem</button>
+      <div class="surface rounded-xl overflow-hidden">
+        <div class="flex border-b border-default">
+          <button class="flex-1 py-3.5 text-sm font-medium border-b-2 border-[color:var(--accent)]">Deposit</button>
+          <button class="flex-1 py-3.5 text-sm font-medium text-muted border-b-2 border-transparent">Redeem</button>
         </div>
-        <div class="p-5 space-y-3">
-          <label class="block text-xs text-neutral-500 uppercase tracking-wider">Amount (USDC)</label>
-          <div class="flex items-center gap-2 border border-white/10 rounded-md px-3 py-2 focus-within:border-indigo-400">
-            <input value="1000" class="bg-transparent flex-1 outline-none mono" />
-            <span class="text-xs text-neutral-500">USDC</span>
+        <div class="p-6 space-y-4">
+          <label class="block">
+            <div class="mono text-xs uppercase tracking-wider text-muted mb-1.5">Amount (USDC)</div>
+            <div class="flex items-center gap-2 border border-default rounded-md px-3 py-2.5 bg-[color:var(--background)] focus-within:border-[color:var(--foreground)]">
+              <input value="1000" class="bg-transparent flex-1 outline-none mono text-base" />
+              <span class="text-xs text-muted mono">USDC</span>
+            </div>
+          </label>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between"><span class="text-muted">You receive</span><span class="mono">7.918 shares</span></div>
+            <div class="flex justify-between"><span class="text-muted">NAV</span><span class="mono">126.3</span></div>
+            <div class="flex justify-between"><span class="text-muted">Slippage tolerance</span><span class="mono">0.10%</span></div>
           </div>
-          <div class="flex justify-between text-xs text-neutral-500"><span>You receive</span><span class="mono text-neutral-300">7.918 shares</span></div>
-          <div class="flex justify-between text-xs text-neutral-500"><span>NAV</span><span class="mono text-neutral-300">126.3</span></div>
-          <button class="w-full py-2.5 rounded-md bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium glow">Deposit USDC</button>
+          <button class="w-full py-3 rounded-md btn-primary text-sm font-medium">Deposit USDC</button>
         </div>
       </div>
 
-      <div class="rounded-xl border border-white/5 p-5 space-y-2 text-sm">
-        <div class="text-xs text-neutral-500 uppercase tracking-wider mb-1">Builder</div>
-        <div class="flex items-center justify-between"><span class="mono">0x9bF1…2c0a</span><span class="text-neutral-400">alpha-lab.eth</span></div>
-        <div class="flex items-center justify-between text-xs text-neutral-500"><span>Skin in the game</span><span class="mono text-neutral-300">12.4%</span></div>
+      <div class="surface rounded-xl p-6 space-y-3 text-sm">
+        <div class="mono text-xs uppercase tracking-wider text-muted mb-2">Builder</div>
+        <div class="flex items-center justify-between">
+          <span class="mono">0x9bF1…2c0a</span>
+          <span class="text-muted">alpha-lab.eth</span>
+        </div>
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-muted mono uppercase tracking-wider">Skin in the game</span>
+          <span class="mono font-semibold">12.4%</span>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
-<footer class="border-t border-white/5 mt-16">
-  <div class="max-w-6xl mx-auto px-5 py-6 text-xs text-neutral-500 flex justify-between">
+<footer class="border-t border-default mt-16">
+  <div class="max-w-6xl mx-auto px-6 py-8 text-xs text-muted flex justify-between mono uppercase tracking-wider">
     <div>EigenVaults · prototype · all data is mocked</div>
-    <a href="https://github.com/chainyoda/lighteragent" class="hover:text-neutral-300">GitHub →</a>
+    <a href="https://github.com/chainyoda/lighteragent" class="hover:text-[color:var(--foreground)]">GitHub →</a>
   </div>
 </footer>
 
