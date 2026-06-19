@@ -88,13 +88,14 @@ async function deploy() {
   setStatus("agent live on EigenCompute", "primary");
   editorStatus().textContent = "deployed";
 
-  const btn = createBtn();
-  btn.disabled = false;
-  btn.classList.remove("opacity-50", "cursor-not-allowed");
-  btn.textContent = "Create vault for this agent";
+  const vaultSection = document.getElementById("vault-section");
+  if (vaultSection) {
+    vaultSection.classList.remove("hidden");
+    vaultSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   document.getElementById("deploy-btn").disabled = false;
-  document.getElementById("deploy-btn").textContent = "Re-deploy";
+  document.getElementById("deploy-btn").textContent = "Re-deploy agent";
 }
 
 function init() {
@@ -112,7 +113,25 @@ function init() {
 
   document.getElementById("deploy-btn").addEventListener("click", deploy);
 
-  createBtn().addEventListener("click", createVault);
+  const cv = createBtn();
+  if (cv) cv.addEventListener("click", createVault);
+
+  const skip = document.getElementById("skip-vault-btn");
+  if (skip) {
+    skip.addEventListener("click", (e) => {
+      e.preventDefault();
+      const section = document.getElementById("vault-section");
+      const card = document.createElement("div");
+      card.className = "rounded-md p-5 mt-4";
+      card.style.cssText = "background: oklch(var(--well)); border: 1px solid oklch(var(--border));";
+      card.innerHTML = `
+        <div class="text-xs mono uppercase tracking-wider text-muted mb-1">Running privately</div>
+        <div class="text-sm text-muted">Your agent is live on EigenCompute and traded only by your TEE wallet. List a vault any time to open it to investors.</div>
+        <div class="mt-3"><a href="./index.html" class="mono text-xs text-accent hover:underline">← BACK TO DISCOVER</a></div>
+      `;
+      section.replaceChildren(card);
+    });
+  }
 }
 
 async function createVault() {
@@ -163,7 +182,7 @@ async function createVault() {
       await appendLog(`✗ user rejected signature`);
       btn.disabled = false;
       btn.classList.remove("opacity-50");
-      btn.textContent = "Create vault for this agent";
+      btn.textContent = "List vault";
       return;
     }
   } else {
