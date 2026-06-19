@@ -102,14 +102,15 @@
       <p class="text-xs text-muted mt-3">
         The compiler maps your description onto the
         <a href="https://github.com/chainyoda/lighteragent/tree/main/agent-sdk" class="text-accent hover:underline">EigenStrategies SDK</a>'s
-        <code class="mono">Strategy.decide()</code> interface and produces a Python module + Dockerfile. Markets supported in v1: BTC-PERP, ETH-PERP, SOL-PERP on Lighter.
+        <code class="mono">Strategy.decide()</code> interface and produces a Python module + Dockerfile. Markets supported in v1: BTC-PERP (50×), ETH-PERP (50×), SOL-PERP (25×) on Lighter. Funding settles hourly; Lighter charges <span class="mono">0% maker / 0% taker</span> on Standard accounts, so the only trading cost is the vault's own per-trade fee.
       </p>
 
       <!-- Tunable parameters -->
       <div class="mt-5 grid grid-cols-1 md:grid-cols-3 gap-5 well rounded-md border border-default p-4">
         <label class="block">
           <div class="flex justify-between mono text-xs uppercase tracking-wider text-muted"><span>Max leverage</span><span id="p-lev-val" class="text-[color:oklch(var(--foreground))]">2.0x</span></div>
-          <input id="p-lev" type="range" min="1" max="5" step="0.5" value="2" class="w-full mt-2 accent-[color:oklch(var(--primary))]" />
+          <input id="p-lev" type="range" min="1" max="50" step="1" value="2" class="w-full mt-2 accent-[color:oklch(var(--primary))]" />
+          <div class="text-[0.7rem] text-muted mt-1">Lighter caps: BTC/ETH 50×, SOL 25×</div>
         </label>
         <label class="block">
           <div class="flex justify-between mono text-xs uppercase tracking-wider text-muted"><span>Max notional / trade</span><span id="p-size-val" class="text-[color:oklch(var(--foreground))]">$5k</span></div>
@@ -120,6 +121,8 @@
           <input id="p-stop" type="range" min="0.5" max="6" step="0.1" value="2" class="w-full mt-2 accent-[color:oklch(var(--primary))]" />
         </label>
       </div>
+
+      <div class="mt-2 text-xs text-muted">These become the vault's <span class="text-[color:oklch(var(--foreground))]">enforced guardrails</span> — applied by the runtime inside the TEE, so the strategy can't exceed them, not just suggested in code.</div>
 
       <div class="mt-4 flex items-center gap-3 flex-wrap">
         <span class="mono text-xs uppercase tracking-wider text-muted">Deploy mode</span>
@@ -305,9 +308,9 @@
   </div>
 </footer>
 
-<script src="./data.js?v=6" defer></script>
-<script src="./ui.js?v=6" defer></script>
-<script src="./wallet.js?v=6" defer></script>
-<script src="./create.js?v=6" defer></script>
+<script src="./data.js?v=7" defer></script>
+<script src="./ui.js?v=7" defer></script>
+<script src="./wallet.js?v=7" defer></script>
+<script src="./create.js?v=7" defer></script>
 </body>
 </html>

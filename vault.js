@@ -11,6 +11,19 @@
     const a = ES.ARCHETYPES[v.archetype];
     document.title = `${v.name} — EigenStrategies`;
 
+    // ---- tab navigation -------------------------------------------------
+    const PANELS = ["overview", "risk", "activity", "trust", "guide"];
+    function showTab(name) {
+      if (!PANELS.includes(name)) name = "overview";
+      // set inline display so it works even if utility CSS is slow/unavailable
+      document.querySelectorAll("[data-panel]").forEach((p) => { p.style.display = p.dataset.panel === name ? "" : "none"; });
+      document.querySelectorAll("#vault-tabs .vtab").forEach((b) => b.setAttribute("aria-pressed", b.dataset.tab === name));
+      if (history.replaceState) history.replaceState(null, "", "#" + name);
+    }
+    document.querySelectorAll("#vault-tabs .vtab").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+    document.querySelectorAll("[data-jump]").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.jump)));
+    showTab((location.hash || "").replace("#", "") || "overview");
+
     // ---- hero -----------------------------------------------------------
     const tile = document.getElementById("v-tile");
     tile.textContent = v.letter;
@@ -68,6 +81,25 @@
     document.getElementById("r-liq").textContent = r.liqDist + "%";
     document.getElementById("r-corr").textContent = r.corrBtc.toFixed(2);
     UI.histogram(document.getElementById("r-hist"), v.series60.dailyLive, { h: 80 });
+
+    // ---- enforced guardrails (mirrors guardrails.py limits) -------------
+    const g = v.guardrails;
+    const guardRows = [
+      ["Allowed markets", g.allowedMarkets.join(", ")],
+      ["Max leverage", `${g.maxLeverage}× (Lighter cap ${g.venueMaxLeverage}×)`],
+      ["Max gross exposure", fmt.usd(g.maxGrossNotional)],
+      ["Max notional / market", fmt.usd(g.maxNotionalPerMarket)],
+      ["Max notional / order", fmt.usd(g.maxNotionalPerOrder)],
+      ["Min free collateral", fmt.usd(g.minFreeCollateral)],
+      ["Drawdown circuit breaker", (g.maxDrawdownPct * 100).toFixed(0) + "% → flatten + halt"],
+      ["Max orders / tick", String(g.maxOrdersPerTick)],
+    ];
+    const guardEl = document.getElementById("guard-rows");
+    if (guardEl) {
+      guardEl.innerHTML = guardRows.map(([k, val]) =>
+        `<div class="flex justify-between gap-4 border-b border-default pb-2"><span class="text-muted">${k}</span><span class="mono text-right">${val}</span></div>`
+      ).join("");
+    }
 
     // ---- positions (with live marks) ------------------------------------
     const positions = v.positions.map((p) => ({ ...p }));
@@ -140,6 +172,23 @@
         </div>`;
       vlist.appendChild(row);
     });
+
+    // ---- Lighter market parameters (official venue specs) ---------------
+    const specBody = document.getElementById("spec-rows");
+    if (specBody) {
+      v.markets.forEach((m) => {
+        const s = ES.LIGHTER.markets[m];
+        const tr = document.createElement("tr");
+        tr.className = "border-t border-default";
+        tr.innerHTML = `
+          <td class="py-1.5 mono">${m}</td>
+          <td class="py-1.5 text-right mono">${s.maxLev}×</td>
+          <td class="py-1.5 text-right mono text-muted">${s.tick}</td>
+          <td class="py-1.5 text-right mono text-muted">${s.amountStep}</td>
+          <td class="py-1.5 text-right mono text-muted">${(s.imr * 100).toFixed(1)}% / ${(s.mmr * 100).toFixed(1)}%</td>`;
+        specBody.appendChild(tr);
+      });
+    }
 
     // ---- builder track record ------------------------------------------
     const b = ES.builderProfile(v.builder);

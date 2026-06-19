@@ -92,6 +92,24 @@ Then `ecloud compute app deploy` and paste the returned image hash into the
 the [SDK README](./agent-sdk/) and [reference agent](./agents/funding-carry/)
 for the full picture.
 
+### Lighter venue parameters (v1)
+
+The prototype's market specs, leverage caps, margin requirements and fees match
+Lighter's official [contract specifications](https://docs.lighter.xyz/perpetual-futures/contract-specifications)
+and [trading fees](https://docs.lighter.xyz/trading/trading-fees):
+
+| Market | Max leverage | Price step | Amount step | IMR / MMR / CMR |
+|---|---|---|---|---|
+| BTC-PERP | 50× | 0.1 | 0.00001 | 2.0% / 1.2% / 0.8% |
+| ETH-PERP | 50× | 0.01 | 0.0001 | 2.0% / 1.2% / 0.8% |
+| SOL-PERP | 25× | 0.001 | 0.001 | 4.0% / 2.4% / 1.6% |
+
+Funding settles **hourly**. Trading fees are **0% maker / 0% taker** on Standard
+accounts (Premium/HFT: 0.002% / 0.02%), so the only per-trade cost an investor
+pays is the vault builder's own `txFeeBps`. These values live in `LIGHTER` in
+[`data.js`](./data.js) and drive price/size tick rounding and liquidation-price
+math across the UI.
+
 ---
 
 ## Context
