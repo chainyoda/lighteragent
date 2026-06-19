@@ -1,6 +1,38 @@
-# EigenVaults — Architecture & Contract Interfaces
+# EigenVaults
 
 A permissionless, attested agent-vault platform where anyone can build, deploy, and run a trading agent on EigenCloud. Investors deposit USDC into a per-agent ERC-4626 vault and are traded by the same algorithm under shared accounting. The vault builder earns configurable transaction-fee and performance-fee shares.
+
+**Live prototype:** https://chainyoda.github.io/lighteragent/
+
+## Repo layout
+
+| Path | What |
+|---|---|
+| [`agent-sdk/`](./agent-sdk/) | Python SDK — implement one `Strategy.decide` method, ship. Handles attestation, Lighter signing, fee accrual. |
+| [`agents/funding-carry/`](./agents/funding-carry/) | Reference agent: delta-neutral funding-rate carry across BTC/ETH/SOL perps. |
+| `index.html` `vault.html` `create.html` | Frontend prototype (also on GitHub Pages). |
+| `wallet.js` | EIP-6963 wallet connection (MetaMask, Rabby, Coinbase, etc.). |
+
+## Build an agent in 30 lines
+
+```python
+from decimal import Decimal
+from eigenvaults_sdk import Strategy, MarketState, Order, run_agent
+
+class MyStrategy(Strategy):
+    tick_seconds = 30
+    def decide(self, state: MarketState):
+        if not state.positions and state.free_collateral > Decimal(100):
+            yield Order(market="BTC-PERP", side="long", size=Decimal("0.001"))
+
+if __name__ == "__main__":
+    run_agent(MyStrategy(), markets=["BTC-PERP"])
+```
+
+Then `ecloud compute app deploy` and paste the returned image hash into the
+[Create vault](https://chainyoda.github.io/lighteragent/create.html) form. See
+the [SDK README](./agent-sdk/) and [reference agent](./agents/funding-carry/)
+for the full picture.
 
 ---
 

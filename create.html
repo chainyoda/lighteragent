@@ -75,7 +75,30 @@
     <div class="surface rounded-xl p-6">
       <div class="flex items-center gap-3 mb-4">
         <div class="step-num">01</div>
-        <div class="display text-lg font-semibold">Build & attest your image</div>
+        <div class="display text-lg font-semibold">Write your strategy</div>
+      </div>
+      <p class="text-sm text-muted mb-3">Subclass <code class="mono">Strategy</code> from the EigenVaults SDK. Return the orders you want this tick.</p>
+      <div class="well rounded-md p-4 mono text-xs border border-default leading-relaxed overflow-x-auto">
+<span class="text-muted"># strategy.py</span>
+<span class="text-primary">from</span> eigenvaults_sdk <span class="text-primary">import</span> Strategy, Order, run_agent
+
+<span class="text-primary">class</span> <span class="text-accent">MyStrategy</span>(Strategy):
+    <span class="text-primary">def</span> <span class="text-accent">decide</span>(<span class="text-primary">self</span>, state):
+        <span class="text-primary">if not</span> state.positions:
+            <span class="text-primary">yield</span> Order(market=<span class="text-accent">"BTC-PERP"</span>, side=<span class="text-accent">"long"</span>, size=<span class="text-accent">0.001</span>)
+
+run_agent(MyStrategy(), markets=[<span class="text-accent">"BTC-PERP"</span>])
+      </div>
+      <div class="mt-3 flex gap-3 text-xs">
+        <a href="https://github.com/chainyoda/lighteragent/tree/main/agent-sdk" class="mono text-accent hover:underline">SDK DOCS →</a>
+        <a href="https://github.com/chainyoda/lighteragent/tree/main/agents/funding-carry" class="mono text-accent hover:underline">REFERENCE AGENT →</a>
+      </div>
+    </div>
+
+    <div class="surface rounded-xl p-6">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="step-num">02</div>
+        <div class="display text-lg font-semibold">Deploy to EigenCompute</div>
       </div>
       <div class="well rounded-md p-4 mono text-sm border border-default">
         <div class="text-muted"># in your strategy repo</div>
@@ -87,7 +110,7 @@
 
     <div class="surface rounded-xl p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <div class="step-num">02</div>
+        <div class="step-num">03</div>
         <div class="display text-lg font-semibold">Vault metadata</div>
       </div>
       <label class="block">
@@ -102,7 +125,7 @@
 
     <div class="surface rounded-xl p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <div class="step-num">03</div>
+        <div class="step-num">04</div>
         <div class="display text-lg font-semibold">Attestation binding</div>
       </div>
       <label class="block">
@@ -117,7 +140,7 @@
 
     <div class="surface rounded-xl p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <div class="step-num">04</div>
+        <div class="step-num">05</div>
         <div class="display text-lg font-semibold">Fees</div>
       </div>
       <div class="grid grid-cols-2 gap-4">
