@@ -6,7 +6,7 @@ A permissionless, attested agent-vault platform where anyone can build, deploy, 
 
 ## Context
 
-Sreeram wants the Fraction-style "anyone-builds-and-anyone-invests" pattern reframed as an **Eigen reference app**. Fraction itself is a competitive-agent platform with no vault/fund primitive, so it is only directional inspiration. The real mechanic — pooled capital traded by a single algorithm with a creator-share — is closer to Hyperliquid Vaults and **Lighter Public Pools**.
+An Eigen reference app for the "anyone-builds-and-anyone-invests" pattern: pooled capital traded by a single algorithm with a creator-share. The closest existing primitives are Hyperliquid Vaults and **Lighter Public Pools**.
 
 Lighter Public Pools today are:
 - **Permissioned** (operators must be whitelisted).
