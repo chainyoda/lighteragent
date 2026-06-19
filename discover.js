@@ -4,7 +4,9 @@
   "use strict";
   function start() {
     if (!window.ES || !window.UI) return setTimeout(start, 30);
-    const { VAULTS, ARCHETYPES, fmt } = ES;
+    const { ARCHETYPES, fmt } = ES;
+    // include builder-created vaults (persisted in localStorage) alongside samples
+    const VAULTS = ES.VAULTS.concat(ES.loadCustomVaults());
 
     // ---- hero stats -----------------------------------------------------
     const totalTvl = VAULTS.reduce((s, v) => s + v.tvl, 0);
