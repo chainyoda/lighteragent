@@ -71,7 +71,7 @@
     </a>
     <nav class="flex items-center gap-1 text-sm">
       <a href="./index.html" class="px-3 py-1.5 rounded-md font-medium">Discover</a>
-      <a href="./create.html" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:oklch(var(--foreground))]">Create vault</a>
+      <a href="./create.html" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:oklch(var(--foreground))]">Build agent</a>
       <a href="https://github.com/chainyoda/lighteragent" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:oklch(var(--foreground))]">Docs</a>
     </nav>
     <button data-wallet-btn class="text-sm px-3.5 py-1.5 rounded-md border border-default hover:border-[color:oklch(var(--foreground))] mono">Connect wallet</button>
@@ -82,17 +82,26 @@
   <div class="max-w-6xl mx-auto px-6 py-20">
     <div class="mono text-xs uppercase tracking-[0.18em] text-muted mb-6">An Eigen Labs Project</div>
     <h1 class="display text-5xl md:text-6xl font-semibold leading-[1.05] max-w-4xl">
-      Trading agents, attested in a TEE,<br />
-      <span class="underline-accent">funded by anyone.</span>
+      Verifiable trading agents.<br />
+      <span class="underline-accent">Open to anyone.</span>
     </h1>
     <p class="text-lg text-muted mt-6 max-w-2xl leading-relaxed">
-      Builders deploy a strategy to EigenCompute. Investors deposit USDC into an ERC-4626 vault that pins the
-      attested image hash. The same algorithm trades for everyone on Lighter perps.
+      Anyone can build a trading agent in plain English, deploy it to a TEE on EigenCompute, and trade Lighter perps. Anyone else can fund it — and be traded by the same algorithm under shared accounting.
     </p>
-    <div class="mt-9 flex gap-3 flex-wrap">
-      <a href="#vaults" class="btn-primary px-5 py-2.5 rounded-md text-sm font-medium">Browse vaults</a>
-      <a href="./create.html" class="px-5 py-2.5 rounded-md border border-default hover:border-[color:oklch(var(--foreground))] text-sm font-medium">Build your own agent →</a>
-      <a href="https://github.com/chainyoda/lighteragent" class="px-5 py-2.5 rounded-md border border-default hover:border-[color:oklch(var(--foreground))] text-sm font-medium">Read the architecture</a>
+
+    <div class="mt-12 grid grid-cols-1 md:grid-cols-2 gap-5 max-w-4xl">
+      <div class="surface rounded-xl p-6">
+        <div class="mono text-xs uppercase tracking-[0.12em] text-accent mb-2">For builders</div>
+        <div class="display text-2xl font-semibold mb-3">Ship a strategy</div>
+        <p class="text-sm text-muted leading-relaxed mb-5">Describe a strategy in English. We compile it, attest it in a TEE, run it on EigenCompute. Trade your own funds, or list a vault and earn fees on outside capital.</p>
+        <a href="./create.html" class="btn-primary inline-block px-5 py-2.5 rounded-md text-sm font-medium">Build agent →</a>
+      </div>
+      <div class="surface rounded-xl p-6">
+        <div class="mono text-xs uppercase tracking-[0.12em] text-accent mb-2">For investors</div>
+        <div class="display text-2xl font-semibold mb-3">Fund a strategy</div>
+        <p class="text-sm text-muted leading-relaxed mb-5">Deposit USDC into a per-agent ERC-4626 vault that pins the attested image hash. The builder cannot silently change the strategy. Withdraw any time.</p>
+        <a href="#vaults" class="inline-block px-5 py-2.5 rounded-md border border-default hover:border-[color:oklch(var(--foreground))] text-sm font-medium">Browse vaults →</a>
+      </div>
     </div>
 
     <div class="mt-14 grid grid-cols-3 max-w-2xl gap-10">
