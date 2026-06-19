@@ -49,6 +49,9 @@
   .tab-active { border-bottom: 2px solid oklch(var(--accent)); }
   .seg { font-family:"Geist Mono",monospace; font-size:0.7rem; padding:0.25rem 0.6rem; border-radius:0.4rem; cursor:pointer; border:1px solid oklch(var(--border)); color:oklch(var(--muted-foreground)); }
   .seg[aria-pressed="true"] { background:oklch(var(--primary) / 0.1); color:oklch(var(--primary)); border-color:oklch(var(--primary) / 0.4); }
+  .vtab { padding:0.6rem 0.9rem; font-size:0.875rem; font-weight:500; color:oklch(var(--muted-foreground)); border-bottom:2px solid transparent; white-space:nowrap; cursor:pointer; background:transparent; }
+  .vtab:hover { color:oklch(var(--foreground)); }
+  .vtab[aria-pressed="true"] { color:oklch(var(--foreground)); border-bottom-color:oklch(var(--accent)); }
   .pulse { animation: pulse 2s ease-in-out infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
 </style>
@@ -89,7 +92,18 @@
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <div class="lg:col-span-2 space-y-6">
+    <div class="lg:col-span-2">
+
+      <!-- Tab navigation -->
+      <div id="vault-tabs" class="border-b border-default flex gap-1 mb-6 overflow-x-auto">
+        <button class="vtab" data-tab="overview" aria-pressed="true">Overview</button>
+        <button class="vtab" data-tab="risk" aria-pressed="false">Risk</button>
+        <button class="vtab" data-tab="activity" aria-pressed="false">Activity</button>
+        <button class="vtab" data-tab="trust" aria-pressed="false">Trust &amp; params</button>
+        <button class="vtab" data-tab="guide" aria-pressed="false">How it works</button>
+      </div>
+
+      <div data-panel="overview" class="space-y-6">
 
       <!-- Equity chart with live vs backtest overlay -->
       <div class="surface rounded-xl p-6">
@@ -135,6 +149,9 @@
         <div class="surface rounded-xl p-5"><div class="mono text-xs uppercase tracking-wider text-muted">Investors</div><div id="m-inv" class="display text-2xl font-semibold mt-1">—</div></div>
       </div>
 
+      </div><!-- /overview -->
+
+      <div data-panel="risk" class="space-y-6 hidden">
       <!-- Risk panel -->
       <div class="surface rounded-xl p-6">
         <div class="flex items-center justify-between mb-5">
@@ -171,6 +188,9 @@
         </div>
       </div>
 
+      </div><!-- /risk -->
+
+      <div data-panel="activity" class="space-y-6 hidden">
       <!-- Live positions -->
       <div class="surface rounded-xl overflow-hidden">
         <div class="flex items-center justify-between px-6 py-4 border-b border-default">
@@ -214,6 +234,9 @@
         </div>
       </div>
 
+      </div><!-- /activity -->
+
+      <div data-panel="trust" class="space-y-6 hidden">
       <!-- Trust & attestation -->
       <div class="surface rounded-xl p-6">
         <div class="mono text-xs uppercase tracking-[0.12em] text-muted mb-4">Trust &amp; attestation</div>
@@ -267,6 +290,57 @@
         </div>
         <div id="b-other" class="mt-4 pt-4 border-t border-default"></div>
       </div>
+      </div><!-- /trust -->
+
+      <!-- How it works / guide -->
+      <div data-panel="guide" class="space-y-6 hidden">
+        <div class="surface rounded-xl p-6">
+          <h2 class="display text-xl font-semibold mb-1">How this vault works</h2>
+          <p class="text-sm text-muted mb-5">A 60-second guide to depositing into an agent-traded vault on EigenStrategies.</p>
+
+          <ol class="space-y-4">
+            <li class="flex gap-3">
+              <span class="shrink-0 h-6 w-6 rounded-full icon-tile-primary flex items-center justify-center mono text-xs">1</span>
+              <div><div class="font-medium text-sm">Connect your wallet</div>
+              <p class="text-sm text-muted">Use the <span class="mono">Connect wallet</span> button (top right). We only read your address — no transaction is signed in this prototype.</p></div>
+            </li>
+            <li class="flex gap-3">
+              <span class="shrink-0 h-6 w-6 rounded-full icon-tile-primary flex items-center justify-center mono text-xs">2</span>
+              <div><div class="font-medium text-sm">Deposit USDC</div>
+              <p class="text-sm text-muted">Enter an amount in the <span class="mono">Deposit</span> panel. You receive ERC-4626 <em>shares</em> priced at the current NAV. The calculator shows your projected value net of fees.</p></div>
+            </li>
+            <li class="flex gap-3">
+              <span class="shrink-0 h-6 w-6 rounded-full icon-tile-primary flex items-center justify-center mono text-xs">3</span>
+              <div><div class="font-medium text-sm">The agent trades</div>
+              <p class="text-sm text-muted">A strategy running in an EigenCompute TEE trades your pooled USDC on Lighter perps. Watch it live under <button class="text-accent" data-jump="activity">Activity</button> and <button class="text-accent" data-jump="risk">Risk</button>.</p></div>
+            </li>
+            <li class="flex gap-3">
+              <span class="shrink-0 h-6 w-6 rounded-full icon-tile-primary flex items-center justify-center mono text-xs">4</span>
+              <div><div class="font-medium text-sm">Redeem anytime</div>
+              <p class="text-sm text-muted">Switch to the <span class="mono">Redeem</span> tab to burn shares back to USDC at NAV. No lockups. Shares are a transferable ERC-20.</p></div>
+            </li>
+          </ol>
+        </div>
+
+        <div class="surface rounded-xl p-6 space-y-4 text-sm">
+          <div>
+            <div class="font-medium mb-1">What does "TEE attested" mean?</div>
+            <p class="text-muted">The strategy runs inside a Trusted Execution Environment on EigenCompute. Its code compiles to an <em>image hash</em> pinned onchain, and only the wallet derived from that hash can move funds. The builder can't silently swap the strategy — see <button class="text-accent" data-jump="trust">Trust &amp; params</button>.</p>
+          </div>
+          <div>
+            <div class="font-medium mb-1">Fees</div>
+            <p class="text-muted">You pay the builder's <em>performance fee</em> (on profits above the high-water mark) and a small <em>per-trade fee</em>. Lighter itself charges <span class="mono">0% maker / 0% taker</span> on Standard accounts. No management/AUM fee.</p>
+          </div>
+          <div>
+            <div class="font-medium mb-1">Redemption windows</div>
+            <p class="text-muted">If a builder proposes a new strategy image, a 24h redemption window opens so you can exit at the last high-water mark before the change takes effect. Watch for the badge on this page and in your <a href="./portfolio.html" class="text-accent">Portfolio</a>.</p>
+          </div>
+          <div>
+            <div class="font-medium mb-1">Risks</div>
+            <p class="text-muted">You're exposed to market risk and the strategy losing money within its rules. Backtests aren't promises — check max drawdown, the live-vs-backtest gap, leverage and builder skin-in-the-game before depositing.</p>
+          </div>
+        </div>
+      </div><!-- /guide -->
     </div>
 
     <!-- Right column -->
@@ -358,9 +432,9 @@
 </footer>
 
 <style>.cmp-checkbox{accent-color:oklch(var(--primary));width:0.95rem;height:0.95rem;cursor:pointer}</style>
-<script src="./data.js" defer></script>
-<script src="./ui.js" defer></script>
-<script src="./vault.js" defer></script>
-<script src="./wallet.js" defer></script>
+<script src="./data.js?v=7" defer></script>
+<script src="./ui.js?v=7" defer></script>
+<script src="./vault.js?v=7" defer></script>
+<script src="./wallet.js?v=7" defer></script>
 </body>
 </html>

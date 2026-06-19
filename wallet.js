@@ -3,14 +3,48 @@
 
 const PROVIDERS = new Map();
 let connected = null;
+let onProvidersChanged = null;
 
 function shorten(a) { return a.slice(0, 6) + "…" + a.slice(-4); }
 
 window.addEventListener("eip6963:announceProvider", (e) => {
   const { info, provider } = e.detail;
   PROVIDERS.set(info.uuid, { info, provider });
+  if (onProvidersChanged) onProvidersChanged();
 });
-window.dispatchEvent(new Event("eip6963:requestProvider"));
+
+// Ask wallets to (re)announce themselves. Wallet content scripts can register
+// their listener slightly after our script runs, so a single request at load
+// can miss them — re-request now and a few more times shortly after.
+function requestProviders() {
+  window.dispatchEvent(new Event("eip6963:requestProvider"));
+}
+requestProviders();
+[150, 500, 1200].forEach((ms) => setTimeout(requestProviders, ms));
+
+// Fallback for wallets that inject window.ethereum but don't announce via
+// EIP-6963 (older versions, some mobile in-app browsers).
+function legacyProviders() {
+  const eth = window.ethereum;
+  if (!eth) return [];
+  const list = Array.isArray(eth.providers) && eth.providers.length ? eth.providers : [eth];
+  return list.map((provider, i) => {
+    const name = provider.isMetaMask ? "MetaMask"
+      : provider.isRabby ? "Rabby"
+      : provider.isCoinbaseWallet ? "Coinbase Wallet"
+      : provider.isBraveWallet ? "Brave Wallet"
+      : "Injected wallet";
+    return { info: { uuid: "legacy-" + i, name, rdns: "window.ethereum", icon: "" }, provider };
+  });
+}
+
+// Merge announced (EIP-6963) providers with any legacy ones, de-duped.
+function allProviders() {
+  const out = Array.from(PROVIDERS.values());
+  const seen = new Set(out.map((p) => p.info.name));
+  for (const p of legacyProviders()) if (!seen.has(p.info.name)) { out.push(p); seen.add(p.info.name); }
+  return out;
+}
 
 function loadStored() {
   try {
@@ -43,7 +77,6 @@ function openModal() {
   overlay.id = "wallet-modal";
   overlay.style.cssText =
     "position:fixed;inset:0;background:oklch(0.255 0.012 122 / 0.45);backdrop-filter:blur(4px);z-index:50;display:flex;align-items:center;justify-content:center;padding:1rem;";
-  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
 
   const modal = document.createElement("div");
   modal.style.cssText =
@@ -62,19 +95,25 @@ function openModal() {
 
   const list = document.createElement("div");
   list.style.cssText = "padding:0.75rem;display:flex;flex-direction:column;gap:0.375rem;max-height:60vh;overflow:auto;";
+  modal.appendChild(list);
 
-  const providers = Array.from(PROVIDERS.values());
-  if (providers.length === 0) {
-    const empty = document.createElement("div");
-    empty.style.cssText = "padding:1.5rem;text-align:center;color:oklch(var(--muted-foreground));font-size:0.875rem;line-height:1.6;";
-    empty.innerHTML = `
-      No wallet detected.<br/>
-      <a href="https://metamask.io/download/" target="_blank" rel="noopener" style="color:oklch(var(--accent));text-decoration:underline;">Install MetaMask</a>,
-      <a href="https://rabby.io" target="_blank" rel="noopener" style="color:oklch(var(--accent));text-decoration:underline;">Rabby</a>, or
-      <a href="https://www.coinbase.com/wallet/downloads" target="_blank" rel="noopener" style="color:oklch(var(--accent));text-decoration:underline;">Coinbase Wallet</a>.
-    `;
-    list.appendChild(empty);
-  } else {
+  function renderList() {
+    const providers = allProviders();
+    list.innerHTML = "";
+    if (providers.length === 0) {
+      const empty = document.createElement("div");
+      empty.style.cssText = "padding:1.5rem;text-align:center;color:oklch(var(--muted-foreground));font-size:0.875rem;line-height:1.6;";
+      empty.innerHTML = `
+        Detecting wallets…<br/>
+        <span style="font-size:0.8rem">If nothing appears, install
+        <a href="https://metamask.io/download/" target="_blank" rel="noopener" style="color:oklch(var(--accent));text-decoration:underline;">MetaMask</a>,
+        <a href="https://rabby.io" target="_blank" rel="noopener" style="color:oklch(var(--accent));text-decoration:underline;">Rabby</a> or
+        <a href="https://www.coinbase.com/wallet/downloads" target="_blank" rel="noopener" style="color:oklch(var(--accent));text-decoration:underline;">Coinbase Wallet</a>,
+        then reload.</span>
+      `;
+      list.appendChild(empty);
+      return;
+    }
     providers.forEach(({ info, provider }) => {
       const row = document.createElement("button");
       row.style.cssText =
@@ -82,7 +121,7 @@ function openModal() {
       row.onmouseenter = () => { row.style.borderColor = "oklch(var(--foreground))"; row.style.background = "oklch(var(--well) / 0.5)"; };
       row.onmouseleave = () => { row.style.borderColor = "oklch(var(--border))"; row.style.background = "transparent"; };
       row.innerHTML = `
-        <img src="${info.icon}" alt="" style="width:32px;height:32px;border-radius:0.5rem;flex-shrink:0;" onerror="this.style.display='none'"/>
+        <img src="${info.icon}" alt="" style="width:32px;height:32px;border-radius:0.5rem;flex-shrink:0;${info.icon ? "" : "display:none"}" onerror="this.style.display='none'"/>
         <div style="flex:1;min-width:0;">
           <div style="font-weight:500;">${info.name}</div>
           <div style="font-family:'Geist Mono',monospace;font-size:0.7rem;color:oklch(var(--muted-foreground));margin-top:0.125rem;">${info.rdns}</div>
@@ -93,16 +132,21 @@ function openModal() {
       list.appendChild(row);
     });
   }
-  modal.appendChild(list);
+  renderList();
+  // re-ask wallets to announce, and live-refresh the list as they do
+  onProvidersChanged = renderList;
+  requestProviders();
 
   const footer = document.createElement("div");
   footer.style.cssText = "padding:0.875rem 1.5rem;border-top:1px solid oklch(var(--border));font-size:0.75rem;color:oklch(var(--muted-foreground));line-height:1.5;";
   footer.innerHTML = `EigenStrategies will request your address only. No transactions are signed in this prototype.`;
   modal.appendChild(footer);
 
+  function close() { onProvidersChanged = null; overlay.remove(); }
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
-  document.getElementById("wallet-close").addEventListener("click", () => overlay.remove());
+  document.getElementById("wallet-close").addEventListener("click", close);
 }
 
 async function connect(provider, info, overlay) {
@@ -121,18 +165,32 @@ async function connect(provider, info, overlay) {
     };
     persist();
     renderButton();
+    onProvidersChanged = null;
     overlay.remove();
 
     provider.on?.("accountsChanged", (accs) => {
       if (!accs.length) disconnect();
-      else { connected.address = accs[0]; persist(); renderButton(); }
+      else { connected.address = accs[0]; persist(); renderButton(); refreshWalletViews(); }
     });
     provider.on?.("chainChanged", (cid) => {
       if (connected) { connected.chainId = cid; persist(); }
     });
+
+    refreshWalletViews();
   } catch (err) {
     console.error("[wallet] connect failed:", err);
     alert(err?.message || "Connection rejected.");
+  }
+}
+
+// Pages that render wallet-specific content (portfolio, a vault's "your
+// position") expose window.onWalletChange; otherwise reload so the new state
+// is reflected. Discover/create define no hook and simply re-render the button.
+function refreshWalletViews() {
+  if (typeof window.onWalletChange === "function") { window.onWalletChange(); return; }
+  if (/portfolio\.html|vault\.html/.test(location.pathname + location.search) ||
+      document.getElementById("your-pos") || document.getElementById("connected")) {
+    location.reload();
   }
 }
 
@@ -140,6 +198,7 @@ function disconnect() {
   connected = null;
   persist();
   renderButton();
+  refreshWalletViews();
 }
 
 function init() {

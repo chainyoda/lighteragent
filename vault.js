@@ -11,6 +11,19 @@
     const a = ES.ARCHETYPES[v.archetype];
     document.title = `${v.name} — EigenStrategies`;
 
+    // ---- tab navigation -------------------------------------------------
+    const PANELS = ["overview", "risk", "activity", "trust", "guide"];
+    function showTab(name) {
+      if (!PANELS.includes(name)) name = "overview";
+      // set inline display so it works even if utility CSS is slow/unavailable
+      document.querySelectorAll("[data-panel]").forEach((p) => { p.style.display = p.dataset.panel === name ? "" : "none"; });
+      document.querySelectorAll("#vault-tabs .vtab").forEach((b) => b.setAttribute("aria-pressed", b.dataset.tab === name));
+      if (history.replaceState) history.replaceState(null, "", "#" + name);
+    }
+    document.querySelectorAll("#vault-tabs .vtab").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+    document.querySelectorAll("[data-jump]").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.jump)));
+    showTab((location.hash || "").replace("#", "") || "overview");
+
     // ---- hero -----------------------------------------------------------
     const tile = document.getElementById("v-tile");
     tile.textContent = v.letter;
