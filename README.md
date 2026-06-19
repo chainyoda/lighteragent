@@ -110,6 +110,28 @@ pays is the vault builder's own `txFeeBps`. These values live in `LIGHTER` in
 [`data.js`](./data.js) and drive price/size tick rounding and liquidation-price
 math across the UI.
 
+### Guardrails run in the TEE (enforced, not just attested)
+
+Risk limits are enforced by the SDK **runtime**, between `strategy.decide()` and
+order submission — so a buggy or malicious strategy *cannot* exceed them. They
+execute in the same attested image that trades, and their values come from the
+vault's published parameters, so the enforced caps are exactly what investors
+were shown. See [`guardrails.py`](./agent-sdk/eigenstrategies_sdk/guardrails.py).
+
+Each tick the runtime drops orders on non-whitelisted markets, **clamps** size
+to the per-order / per-market / gross / leverage caps (vault config *and*
+Lighter's venue max — BTC/ETH 50×, SOL 25×), blocks new risk below a minimum
+free-collateral floor, caps orders per tick, and trips a drawdown circuit
+breaker that allows only reduce-only/flatten orders. This is the layer that
+makes "verifiable" cover risk, not just code:
+
+| Layer | Guarantee |
+|---|---|
+| strategy `decide()` | soft, strategy-specific logic — *attested* (readable, tamper-evident) |
+| **Guardrails (runtime, in-TEE)** | **hard caps — enforced regardless of strategy code** |
+| vault contract | custody — only the TEE wallet can move funds |
+| Lighter | margin / liquidation / venue max leverage |
+
 ---
 
 ## Context
