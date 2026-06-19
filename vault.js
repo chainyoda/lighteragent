@@ -82,6 +82,25 @@
     document.getElementById("r-corr").textContent = r.corrBtc.toFixed(2);
     UI.histogram(document.getElementById("r-hist"), v.series60.dailyLive, { h: 80 });
 
+    // ---- enforced guardrails (mirrors guardrails.py limits) -------------
+    const g = v.guardrails;
+    const guardRows = [
+      ["Allowed markets", g.allowedMarkets.join(", ")],
+      ["Max leverage", `${g.maxLeverage}× (Lighter cap ${g.venueMaxLeverage}×)`],
+      ["Max gross exposure", fmt.usd(g.maxGrossNotional)],
+      ["Max notional / market", fmt.usd(g.maxNotionalPerMarket)],
+      ["Max notional / order", fmt.usd(g.maxNotionalPerOrder)],
+      ["Min free collateral", fmt.usd(g.minFreeCollateral)],
+      ["Drawdown circuit breaker", (g.maxDrawdownPct * 100).toFixed(0) + "% → flatten + halt"],
+      ["Max orders / tick", String(g.maxOrdersPerTick)],
+    ];
+    const guardEl = document.getElementById("guard-rows");
+    if (guardEl) {
+      guardEl.innerHTML = guardRows.map(([k, val]) =>
+        `<div class="flex justify-between gap-4 border-b border-default pb-2"><span class="text-muted">${k}</span><span class="mono text-right">${val}</span></div>`
+      ).join("");
+    }
+
     // ---- positions (with live marks) ------------------------------------
     const positions = v.positions.map((p) => ({ ...p }));
     const posBody = document.getElementById("pos-rows");

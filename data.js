@@ -370,6 +370,21 @@
     v.risk.liqDist = +Math.min(...v.positions.map((p) => p.liqDistPct)).toFixed(1);
     v.maxLevVenue = Math.min(...v.markets.map((m) => LIGHTER.markets[m].maxLev));
     v.archetypeLabel = ARCHETYPES[v.archetype].label;
+    // Published guardrails — enforced in the TEE runtime (see guardrails.py).
+    // Mirrors the GUARD_* limits the runtime loads from the vault's params.
+    const grossCap = v.tvl * v.maxLev;
+    const ddBase = Math.abs(v.stats.mdd) + 0.05;
+    v.guardrails = {
+      allowedMarkets: v.markets,
+      maxLeverage: v.maxLev,
+      venueMaxLeverage: v.maxLevVenue,
+      maxGrossNotional: grossCap,
+      maxNotionalPerMarket: grossCap / v.markets.length,
+      maxNotionalPerOrder: Math.max(5000, Math.round((grossCap / v.markets.length) * 0.25 / 1000) * 1000),
+      minFreeCollateral: Math.round((v.tvl * 0.02) / 1000) * 1000,
+      maxDrawdownPct: Math.min(0.5, Math.max(0.08, Math.ceil((ddBase * 100) / 5) * 5 / 100)),
+      maxOrdersPerTick: ARCHETYPES[v.archetype].turn === "high" ? 40 : 20,
+    };
   });
 
   function byId(id) { return VAULTS.find((v) => v.id === id); }
