@@ -31,7 +31,7 @@
   // to approximately hit them so Sharpe ≈ annRet/annVol stays believable.
   const ARCHETYPES = {
     funding:  { annRet: 0.16, annVol: 0.07, corr: 0.08, turn: "low",   label: "Funding carry" },
-    basis:    { annRet: 0.12, annVol: 0.055, corr: 0.05, turn: "low",  label: "Basis" },
+    basis:    { annRet: 0.12, annVol: 0.055, corr: 0.05, turn: "low",  label: "Funding basis" },
     momentum: { annRet: 0.32, annVol: 0.27, corr: 0.62, turn: "med",   label: "Momentum" },
     trend:    { annRet: 0.24, annVol: 0.23, corr: 0.55, turn: "med",   label: "Trend" },
     meanrev:  { annRet: 0.17, annVol: 0.16, corr: -0.18, turn: "high", label: "Mean reversion" },
@@ -70,13 +70,13 @@
       prose: "Watch ETH-PERP on a 5-minute timeframe. Bollinger Bands, 20-period MA, 2 stdev. Long the lower band when RSI < 30; short the upper band when RSI > 70. Exit on return to the MA. Hard stop at -1.2%.",
     },
     {
-      id: "stable", name: "Yield-Stable LP", letter: "Y", builder: "stable.eth",
+      id: "stable", name: "Yield-Stable Carry", letter: "Y", builder: "stable.eth",
       builderAddr: "0x12cD0a9d217B4E50f2C18Ee4a0B92f3340Dd8412b",
       archetype: "basis", markets: ["BTC-PERP", "ETH-PERP"], maxLev: 1,
       tvl: 5_120_000, investors: 203, perfBps: 1000, txBps: 4, ageDays: 118,
       capacity: 8_000_000, skin: 31.2, attested: true,
-      desc: "Conservative basis + funding capture aiming for steady single-digit-to-teens APR with shallow drawdowns.",
-      prose: "Capture perp basis and funding on BTC and ETH while hedged spot-equivalent via offsetting perp legs. Target low volatility; cap drawdown at 3%. No leverage.",
+      desc: "Conservative perp funding capture aiming for steady single-digit-to-teens APR with shallow drawdowns.",
+      prose: "Capture perp funding on BTC and ETH, kept delta-neutral via offsetting long/short perp legs. Target low volatility; cap drawdown at 3%. No leverage.",
     },
     {
       id: "breakout", name: "Breakout Hunter", letter: "B", builder: "breakout.eth",
@@ -88,13 +88,13 @@
       prose: "Enter long on a 20-bar high breakout, short on a 20-bar low breakout, on BTC/ETH/SOL 1h. Size inversely to ATR. Trailing stop at 2 ATR. Max leverage 4x.",
     },
     {
-      id: "basis", name: "Cash-Carry Basis", letter: "C", builder: "carrytrade.eth",
+      id: "basis", name: "Perp Funding Basis", letter: "C", builder: "carrytrade.eth",
       builderAddr: "0xa1B2c3D4e5F6071109bF1c4D0e2A7b8C36F90a1B2",
       archetype: "basis", markets: ["BTC-PERP"], maxLev: 1,
       tvl: 3_640_000, investors: 142, perfBps: 1200, txBps: 3, ageDays: 96,
       capacity: 5_000_000, skin: 18.9, attested: true,
-      desc: "Single-market BTC cash-and-carry. Captures the perp-funding premium with tight risk and minimal turnover.",
-      prose: "Hold a delta-neutral BTC carry: short perp when annualized funding exceeds 6%, flatten when it falls under 2%. No leverage; rebalance hourly.",
+      desc: "Single-market BTC perp funding harvest. Captures the perp-funding premium with tight risk and minimal turnover.",
+      prose: "Harvest BTC perp funding: hold a short perp position while annualized funding exceeds 6%, flatten when it falls under 2%. Inventory-capped; no leverage; rebalance hourly.",
     },
     {
       id: "trend", name: "Trend Following CTA", letter: "T", builder: "dunn-capital.eth",
