@@ -600,11 +600,12 @@ async function createVault() {
   await appendLog(`✓ tx: ${txHash.slice(0, 22)}…`);
   await appendLog(`✓ attestation bound · valid`);
 
-  // Persist the created vault so the vault page / discover can render it.
+  // Persist the created vault so the vault page / discover can render it
+  // (shared via the store when configured, else per-browser localStorage).
   const prose = proseEl().value.trim();
   const params = readParams();
   const desc = document.querySelector('#vault-section textarea')?.value?.trim() || prose.slice(0, 160);
-  persistCreatedVault({
+  const saveRes = await persistCreatedVault({
     addr: vaultAddr,
     name,
     prose,
@@ -620,6 +621,9 @@ async function createVault() {
     builderAddr: stored?.address,
     createdAt: Date.now(),
   });
+  await appendLog(saveRes.remote
+    ? "✓ published to shared store — visible on every device"
+    : "✓ saved to this browser (add Supabase keys in config.js to share)");
 
   showSuccessCard({ name, vaultAddr, txHash });
 }
@@ -631,7 +635,11 @@ function marketsFromProse(p) {
   return ["BTC-PERP", "ETH-PERP"];
 }
 
-function persistCreatedVault(rec) {
+async function persistCreatedVault(rec) {
+  if (window.VaultStore) {
+    try { return await window.VaultStore.save(rec); }
+    catch (e) { console.warn("[create] store.save failed", e); }
+  }
   try {
     const key = "eigenstrategies:vaults";
     const all = JSON.parse(localStorage.getItem(key) || "{}");
@@ -640,6 +648,7 @@ function persistCreatedVault(rec) {
   } catch (e) {
     console.warn("[create] could not persist vault", e);
   }
+  return { local: true, remote: false };
 }
 
 function showSuccessCard({ name, vaultAddr, txHash }) {
