@@ -335,6 +335,15 @@ async function deploy() {
     return;
   }
 
+  const nameEl = document.getElementById("agent-name");
+  const agentName = (nameEl?.value || "").trim();
+  if (!agentName) {
+    setStatus("name your agent first", "destructive");
+    nameEl?.focus();
+    nameEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
   if (lastBacktestSeed !== seedFrom(prose)) {
     const ok = confirm("You haven't backtested this strategy. Deploy anyway?");
     if (!ok) return;
@@ -343,6 +352,7 @@ async function deploy() {
   document.getElementById("deploy-btn").disabled = true;
   attCard().classList.add("hidden");
   clearLog();
+  await appendLog(`$ deploying agent "${agentName}"`);
   await appendLog(deployMode === "paper"
     ? "$ deploy mode: PAPER — simulated Lighter sub-account, no real funds"
     : "$ deploy mode: LIVE — mainnet funds via TEE wallet");
@@ -372,10 +382,15 @@ async function deploy() {
   const teeWallet = "0x" + hex(seed ^ 0xdeadbeef, 8) + "1c5704d29bb8".slice(0, 32);
   const appId = "ev-" + hex(seed, 8).slice(0, 6);
 
+  document.getElementById("out-agent-name").textContent = agentName;
   document.getElementById("out-image-hash").textContent = imageHash.slice(0, 14) + "…" + imageHash.slice(-6);
   document.getElementById("out-tee-wallet").textContent = teeWallet.slice(0, 10) + "…" + teeWallet.slice(-6);
   document.getElementById("out-app-id").textContent = appId;
   attCard().classList.remove("hidden");
+
+  // prefill the vault name with the agent name (builder can still edit it)
+  const vaultNameInput = document.querySelector('#vault-section input[placeholder="Momentum Macro"]');
+  if (vaultNameInput && !vaultNameInput.value.trim()) vaultNameInput.value = agentName;
 
   await appendLog(`✓ image hash: ${imageHash}`);
   await appendLog(`✓ tee wallet: ${teeWallet}`);
@@ -472,6 +487,8 @@ function init() {
     const v = ES.byId(forkId);
     if (v) {
       proseEl().value = v.prose;
+      const nameEl = document.getElementById("agent-name");
+      if (nameEl && !nameEl.value.trim()) nameEl.value = v.name + " (fork)";
       editorStatus().textContent = "forked from " + v.name;
       const banner = document.getElementById("fork-banner");
       banner.classList.remove("hidden");
@@ -509,7 +526,9 @@ async function createVault() {
   const btn = createBtn();
   if (btn.disabled) return;
 
-  const name = document.querySelector('input[placeholder="Momentum Macro"]')?.value?.trim() || "Untitled Vault";
+  const name = document.querySelector('#vault-section input[placeholder="Momentum Macro"]')?.value?.trim()
+    || document.getElementById("agent-name")?.value?.trim()
+    || "Untitled Vault";
   const perfFee = document.querySelectorAll('input[type="number"]')[0]?.value || "2000";
   const txFee = document.querySelectorAll('input[type="number"]')[1]?.value || "8";
   const imageHash = document.getElementById("out-image-hash").textContent;
