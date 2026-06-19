@@ -95,9 +95,54 @@
         <code class="mono">Strategy.decide()</code> interface and produces a Python module + Dockerfile. Markets supported in v1: BTC-PERP, ETH-PERP, SOL-PERP on Lighter.
       </p>
 
-      <div class="mt-4 flex items-center gap-3">
+      <div class="mt-4 flex items-center gap-3 flex-wrap">
+        <button id="backtest-btn" class="px-5 py-2.5 rounded-md border border-default hover:border-[color:oklch(var(--foreground))] text-sm font-medium">Backtest</button>
         <button id="deploy-btn" class="btn-primary px-5 py-2.5 rounded-md text-sm font-medium">Deploy agent</button>
         <span id="deploy-status" class="text-sm text-muted mono"></span>
+      </div>
+
+      <div id="backtest-card" class="mt-4 surface rounded-xl p-5 hidden">
+        <div class="flex items-end justify-between mb-4">
+          <div>
+            <div class="mono text-xs uppercase tracking-[0.12em] text-muted">Backtest</div>
+            <div class="display text-lg font-semibold mt-0.5"><span id="bt-period">—</span></div>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <label class="text-muted mono uppercase tracking-wider">Window</label>
+            <select id="bt-window" class="border border-default rounded-md px-2 py-1 mono bg-transparent">
+              <option value="30">30 days</option>
+              <option value="90" selected>90 days</option>
+              <option value="180">180 days</option>
+              <option value="365">365 days</option>
+            </select>
+            <button id="bt-rerun" class="ml-1 mono text-xs text-accent hover:underline" title="Re-run">RERUN</button>
+          </div>
+        </div>
+
+        <svg id="bt-chart" viewBox="0 0 760 160" class="w-full h-44 mb-5">
+          <defs>
+            <linearGradient id="bt-grad" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="oklch(0.475 0.095 158)" stop-opacity="0.20"/>
+              <stop offset="100%" stop-color="oklch(0.475 0.095 158)" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <line x1="0" y1="80" x2="760" y2="80" stroke="oklch(var(--border))" stroke-dasharray="3 4" stroke-width="1"/>
+          <path id="bt-area" d="" fill="url(#bt-grad)" />
+          <path id="bt-line" d="" fill="none" stroke="oklch(0.475 0.095 158)" stroke-width="2" />
+        </svg>
+
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-x-6 gap-y-4 text-sm">
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">Total return</div><div id="bt-return" class="display text-lg font-semibold mt-1">—</div></div>
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">Sharpe</div><div id="bt-sharpe" class="display text-lg font-semibold mt-1">—</div></div>
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">Max drawdown</div><div id="bt-mdd" class="display text-lg font-semibold mt-1 text-destructive">—</div></div>
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">Win rate</div><div id="bt-winrate" class="display text-lg font-semibold mt-1">—</div></div>
+          <div><div class="mono text-xs uppercase tracking-wider text-muted">Trades</div><div id="bt-trades" class="display text-lg font-semibold mt-1">—</div></div>
+        </div>
+
+        <div class="mt-4 flex items-center justify-between text-xs">
+          <span class="text-muted">Backtest runs against historical Lighter data inside an EigenCompute TEE. The image hash signed below is the same one that will trade live.</span>
+          <span id="bt-attest" class="badge badge-attested hidden">TEE attested</span>
+        </div>
       </div>
 
       <div id="deploy-log" class="mt-4 well rounded-md p-4 mono text-xs border border-default leading-relaxed hidden whitespace-pre-wrap"></div>

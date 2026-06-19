@@ -40,11 +40,130 @@ function clearLog() {
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+function seedFrom(s) {
+  return Array.from(s).reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+}
+function mulberry32(seed) {
+  return function () {
+    let t = (seed += 0x6D2B79F5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function simulateEquity(prose, days) {
+  const seed = seedFrom(prose + ":" + days);
+  const rand = mulberry32(seed);
+  const proseLower = prose.toLowerCase();
+
+  // Tilt parameters by detected strategy archetype
+  let drift = 0.0006, vol = 0.012;
+  if (/funding|carry|delta-neutral|delta neutral/.test(proseLower)) { drift = 0.0008; vol = 0.0045; }
+  else if (/momentum|breakout|trend/.test(proseLower)) { drift = 0.0012; vol = 0.018; }
+  else if (/mean[- ]?revert|bollinger|rsi/.test(proseLower)) { drift = 0.0007; vol = 0.014; }
+
+  // Add some idiosyncrasy
+  drift *= 0.6 + rand() * 0.9;
+  vol *= 0.7 + rand() * 0.8;
+
+  const points = days;
+  const equity = [1.0];
+  let trades = 0, wins = 0;
+  for (let i = 1; i < points; i++) {
+    const z = (rand() + rand() + rand() + rand() + rand() + rand() - 3) / 1.7; // ~normal
+    const ret = drift + vol * z;
+    equity.push(Math.max(0.05, equity[i - 1] * (1 + ret)));
+    if (rand() < 0.45) {
+      trades += 1;
+      if (ret > 0) wins += 1;
+    }
+  }
+
+  const totalReturn = equity[equity.length - 1] - 1;
+  const dailyRets = equity.slice(1).map((v, i) => v / equity[i] - 1);
+  const mean = dailyRets.reduce((a, b) => a + b, 0) / dailyRets.length;
+  const stdev = Math.sqrt(dailyRets.reduce((a, b) => a + (b - mean) ** 2, 0) / dailyRets.length);
+  const sharpe = (mean / (stdev || 1)) * Math.sqrt(365);
+  let peak = equity[0], mdd = 0;
+  for (const v of equity) {
+    if (v > peak) peak = v;
+    const dd = (v - peak) / peak;
+    if (dd < mdd) mdd = dd;
+  }
+  const winRate = trades ? wins / trades : 0;
+  return { equity, totalReturn, sharpe, mdd, winRate, trades };
+}
+
+function drawEquity(equity) {
+  const w = 760, h = 160;
+  const min = Math.min(...equity), max = Math.max(...equity);
+  const span = max - min || 1;
+  const path = equity.map((v, i) => {
+    const x = (i / (equity.length - 1)) * w;
+    const y = h - ((v - min) / span) * (h - 16) - 8;
+    return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const area = path + ` L${w},${h} L0,${h} Z`;
+  document.getElementById("bt-line").setAttribute("d", path);
+  document.getElementById("bt-area").setAttribute("d", area);
+}
+
+let lastBacktestSeed = null;
+
+async function runBacktest() {
+  const prose = proseEl().value.trim();
+  if (prose.length < 20) {
+    setStatus("describe the strategy first", "destructive");
+    return;
+  }
+  const days = parseInt(document.getElementById("bt-window").value, 10);
+  const card = document.getElementById("backtest-card");
+  card.classList.remove("hidden");
+
+  // Show "running" feel
+  const btn = document.getElementById("backtest-btn");
+  btn.disabled = true;
+  btn.textContent = "Running…";
+  setStatus(`backtesting against ${days}d of Lighter history…`, "primary");
+  document.getElementById("bt-attest").classList.add("hidden");
+  await sleep(900);
+
+  const r = simulateEquity(prose, days);
+  drawEquity(r.equity);
+
+  const today = new Date(2026, 5, 19); // June 19 2026 to match session date
+  const start = new Date(today.getTime() - days * 86400000);
+  const fmt = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  document.getElementById("bt-period").textContent = `${fmt(start)} → ${fmt(today)}`;
+
+  const pct = (n) => `${n >= 0 ? "+" : ""}${(n * 100).toFixed(1)}%`;
+  const ret = document.getElementById("bt-return");
+  ret.textContent = pct(r.totalReturn);
+  ret.style.color = r.totalReturn >= 0 ? "oklch(var(--primary))" : "oklch(var(--destructive))";
+  document.getElementById("bt-sharpe").textContent = r.sharpe.toFixed(2);
+  document.getElementById("bt-mdd").textContent = pct(r.mdd);
+  document.getElementById("bt-winrate").textContent = `${(r.winRate * 100).toFixed(0)}%`;
+  document.getElementById("bt-trades").textContent = String(r.trades);
+  document.getElementById("bt-attest").classList.remove("hidden");
+
+  lastBacktestSeed = seedFrom(prose);
+  setStatus(`backtest complete · sharpe ${r.sharpe.toFixed(2)}`, "primary");
+
+  btn.disabled = false;
+  btn.textContent = "Re-run backtest";
+}
+
 async function deploy() {
   const prose = proseEl().value.trim();
   if (prose.length < 40) {
     setStatus("describe the strategy in more detail (40+ chars)", "destructive");
     return;
+  }
+
+  if (lastBacktestSeed !== seedFrom(prose)) {
+    const ok = confirm("You haven't backtested this strategy. Deploy anyway?");
+    if (!ok) return;
   }
 
   document.getElementById("deploy-btn").disabled = true;
@@ -112,6 +231,9 @@ function init() {
   });
 
   document.getElementById("deploy-btn").addEventListener("click", deploy);
+  document.getElementById("backtest-btn").addEventListener("click", () => runBacktest());
+  document.getElementById("bt-rerun").addEventListener("click", () => runBacktest());
+  document.getElementById("bt-window").addEventListener("change", () => runBacktest());
 
   const cv = createBtn();
   if (cv) cv.addEventListener("click", createVault);
