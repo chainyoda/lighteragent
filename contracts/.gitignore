@@ -1,0 +1,15 @@
+# Foundry build artifacts
+out/
+cache/
+
+# Broadcast / deploy logs (keep dry-run output out of VCS)
+broadcast/
+
+# Coverage
+lcov.info
+
+# Local env
+.env
+
+# Installed deps (reinstall with: forge install)
+lib/

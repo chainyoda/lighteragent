@@ -338,6 +338,42 @@
     return out.reverse();
   }
 
+  // ---- builder economics ------------------------------------------------
+  // Fees a builder has accrued on a vault, split into the two streams the
+  // FeeAccountant charges: performance (HWM share of profit) and per-trade
+  // (txBps on cumulative notional). Builders earn on OUTSIDE capital only —
+  // their own skin-in-the-game slice is excluded (see README).
+  function builderEarnings(v) {
+    const rand = mulberry32(seedFrom(v.id + ":earn"));
+    const outside = v.tvl * (1 - Math.min(100, v.skin || 0) / 100);
+    const profit = Math.max(0, outside * v.stats.totalReturn);
+    const perfFees = profit * (v.perfBps / 1e4);
+    // cumulative traded notional ≈ outside AUM × turnover/day × age in days,
+    // with turnover set by the strategy archetype.
+    const turnPerDay = { low: 0.15, med: 0.6, high: 2.2 }[ARCHETYPES[v.archetype].turn] || 0.5;
+    const volume = outside * turnPerDay * Math.max(1, v.ageDays) * (0.7 + rand() * 0.6);
+    const txFees = volume * (v.txBps / 1e4);
+    return { outside, profit, perfFees, txFees, volume, total: perfFees + txFees };
+  }
+
+  // Agents managed by the connected builder. Vaults created in this browser
+  // (persisted by the create flow) are always yours. When a wallet is
+  // connected we also attach a small deterministic "demo book" of sample
+  // vaults so the dashboard can show the full management experience — the
+  // whole prototype runs on simulated data, like the portfolio page.
+  function myAgents(address) {
+    const custom = loadCustomVaults();
+    let mine = custom.slice();
+    if (address) {
+      const rand = mulberry32(seedFrom(address.toLowerCase() + ":builder"));
+      const demo = VAULTS.filter(() => rand() < 0.3).slice(0, 2);
+      if (!custom.length && demo.length === 0) demo.push(VAULTS[0]);
+      mine = mine.concat(demo);
+    }
+    const seen = new Set();
+    return mine.filter((v) => (seen.has(v.id) ? false : (seen.add(v.id), true)));
+  }
+
   // ---- portfolio (per connected wallet, deterministic by address) -------
   function portfolio(address) {
     if (!address) return { positions: [], totalValue: 0, totalCost: 0, totalPnl: 0, feesPaid: 0 };
@@ -467,6 +503,7 @@
   window.ES = {
     VAULTS, ARCHETYPES, LIGHTER, byId, roundTick, roundStep,
     buildSeries, stats, risk, positions, fills, builderProfile, versions, portfolio,
+    builderEarnings, myAgents,
     hydrate, makeVault, loadCustomVaults,
     seedFrom, mulberry32, fmt,
   };
