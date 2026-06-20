@@ -1,0 +1,23 @@
+{
+  "_comment": "Copy to deployments.json and fill in real addresses after running script/Deploy.s.sol. The frontend (chain.js) fetches deployments.json best-effort; if absent or unreachable it stays in prototype/simulated mode. Keys are decimal chainIds.",
+
+  "421614": {
+    "_network": "Arbitrum Sepolia (testnet) — example",
+    "vaultFactory": "0x0000000000000000000000000000000000000000",
+    "attestationRegistry": "0x0000000000000000000000000000000000000000",
+    "feeAccountant": "0x0000000000000000000000000000000000000000",
+    "lighterAdapter": "0x0000000000000000000000000000000000000000",
+    "usdc": "0x0000000000000000000000000000000000000000",
+    "rpcUrl": "https://sepolia-rollup.arbitrum.io/rpc"
+  },
+
+  "42161": {
+    "_network": "Arbitrum One (mainnet) — example",
+    "vaultFactory": "0x0000000000000000000000000000000000000000",
+    "attestationRegistry": "0x0000000000000000000000000000000000000000",
+    "feeAccountant": "0x0000000000000000000000000000000000000000",
+    "lighterAdapter": "0x0000000000000000000000000000000000000000",
+    "usdc": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    "rpcUrl": "https://arb1.arbitrum.io/rpc"
+  }
+}

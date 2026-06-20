@@ -396,6 +396,15 @@ async function deploy() {
   await appendLog(`✓ tee wallet: ${teeWallet}`);
   await appendLog(`✓ ecloud app id: ${appId}`);
   await appendLog(`✓ attestation registry bind: confirmed`);
+  // Honest note on the real pipeline that now backs this simulated flow:
+  // the agent-runtime image is built and egress-sandboxed with NemoClaw, then
+  // shipped to EigenCompute via deploy/deploy.sh. See BUILD.md / ARCHITECTURE.md.
+  await appendLog(`  pipeline: agent-runtime image → NemoClaw egress allowlist → EigenCompute (deploy/deploy.sh)`);
+  if (window.CHAIN?.isLive?.()) {
+    await appendLog(`  chain: live deployment detected (chainId ${window.CHAIN.chainId}) — would deploy on-chain`);
+  } else {
+    await appendLog(`  chain: no deployments.json — simulated mode (prototype offline default)`);
+  }
 
   setStatus(`agent live on EigenCompute · ${deployMode} mode`, "primary");
   editorStatus().textContent = "deployed";
@@ -544,6 +553,13 @@ async function createVault() {
   await appendLog(`  imageHash: ${imageHash}`);
   await appendLog(`  teeWallet: ${teeWallet}`);
   await appendLog(`  perfFeeBps: ${perfFee}, txFeeBps: ${txFee}`);
+  // Real path: VaultFactory.createVault(VaultParams) deploys the ERC-4626 vault
+  // and binds (imageHash, teeWallet) in AttestationRegistry (contracts/, BUILD.md).
+  if (window.CHAIN?.isLive?.()) {
+    await appendLog(`  → live: VaultFactory @ ${window.CHAIN.addresses.vaultFactory} — would submit a real tx`);
+  } else {
+    await appendLog(`  → simulated: no live VaultFactory configured (set deployments.json to go live)`);
+  }
 
   const stored = (() => { try { return JSON.parse(localStorage.getItem("eigenvaults:wallet")); } catch { return null; }})();
   const provider = window.ethereum;

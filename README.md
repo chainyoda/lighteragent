@@ -4,6 +4,22 @@ A permissionless, attested agent-vault platform where anyone can build, deploy, 
 
 **Live prototype:** https://chainyoda.github.io/lighteragent/
 
+### Build it end-to-end
+
+The full stack — contracts (custody), the NemoClaw-sandboxed agent on
+EigenCompute (execution), and Lighter (settlement) — is wired together by a
+top-level [`Makefile`](./Makefile). See **[`BUILD.md`](./BUILD.md)** for the
+ordered runbook (install → build+test contracts → deploy → build+ship agent →
+createVault → fund USDC → watch it trade → see it on the frontend) and
+**[`ARCHITECTURE.md`](./ARCHITECTURE.md)** for the trust model and component map.
+
+```bash
+make help              # list targets
+make contracts-test    # build + test the contracts
+make all               # contracts + agent image
+make web               # serve the frontend prototype on :8000
+```
+
 ---
 
 ## What this actually is, in trader terms
@@ -64,12 +80,17 @@ A reference agent (delta-neutral funding-rate carry across BTC/ETH/SOL) is in [`
 
 | Path | What |
 |---|---|
+| [`contracts/`](./contracts/) | Custody plane — Foundry project: `VaultFactory`, `EigenVault` (ERC-4626), `AttestationRegistry`, `FeeAccountant`, `LighterAdapter`, plus `script/Deploy.s.sol`. |
+| [`agent-runtime/`](./agent-runtime/) | Execution plane — the attested EigenCompute image (boot, KMS, attestation post, trade loop). |
+| [`deploy/`](./deploy/) | Ships the runtime image into a NemoClaw-sandboxed EigenCompute TEE (`deploy.sh`). |
 | [`agent-sdk/`](./agent-sdk/) | Python SDK — implement one `Strategy.decide` method, ship. Handles attestation, Lighter signing, fee accrual. |
 | [`agents/funding-carry/`](./agents/funding-carry/) | Reference agent: delta-neutral funding-rate carry across BTC/ETH/SOL perps. |
 | `index.html` `vault.html` `create.html` `portfolio.html` `builder.html` | Frontend prototype (also on GitHub Pages): sortable/filterable discover leaderboard with compare, a trader-grade vault page (live-vs-backtest equity overlay, risk panel, live positions & fills, fee calculator, image-rotation history, builder track record), an investor portfolio, a builder studio (param sliders, walk-forward/regime backtest, editable compiled code, paper/live deploy), and a **builder dashboard** ("My agents") aggregating the vaults you've deployed — AUM, investors, fees earned, current attested image, and a one-click image-rotation flow that opens an investor redemption window. |
 | `data.js` `ui.js` | Shared mock data layer (deterministic vault metrics, positions, fills, portfolios, builder earnings) + chart/sparkline/sort/toast helpers. |
 | `discover.js` `vault.js` `portfolio.js` `create.js` `builder.js` | Per-page logic. |
 | `wallet.js` | EIP-6963 wallet connection (MetaMask, Rabby, Coinbase, etc.). |
+| `chain.js` `deployments.example.json` | Frontend ↔ live-deployment seam: loads real contract addresses if present, else stays in prototype/simulated mode. |
+| [`BUILD.md`](./BUILD.md) [`ARCHITECTURE.md`](./ARCHITECTURE.md) `Makefile` | End-to-end runbook, the tighter architecture/trust-model doc, and top-level orchestration (`make help`). |
 
 ## Build an agent in 30 lines
 
