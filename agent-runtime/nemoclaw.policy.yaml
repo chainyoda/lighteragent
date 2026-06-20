@@ -1,0 +1,200 @@
+# =============================================================================
+# NemoClaw (NVIDIA) OpenShell sandbox policy for the LighterClaw agent-runtime.
+# =============================================================================
+# NemoClaw runs the agent inside an OpenShell sandbox with hardware/policy
+# enforced isolation of egress network, filesystem mounts, and syscalls. This
+# manifest is the allowlist. The security goal:
+#
+#   The TEE strategy container can reach ONLY
+#     (a) the Lighter API host(s), and
+#     (b) the configured L2 RPC endpoint.
+#   Nothing else. No DNS to arbitrary hosts, no model/inference endpoints, no
+#   package mirrors, no metadata service.
+#
+# This is defense-in-depth WITH the on-chain teeWallet gating: even if the
+# strategy is malicious or compromised, the vault contract already guarantees
+# funds can only move vault <-> Lighter sub-account <-> vault (bridge fns are
+# teeWallet-gated). This policy adds the network half: a compromised strategy
+# also cannot exfiltrate the KMS-injected mnemonic / TEE key, or beacon to a C2,
+# because every host except Lighter + RPC is denied at the sandbox boundary.
+#
+# Apply at deploy time:  nemoclaw run --policy agent-runtime/nemoclaw.policy.yaml ...
+# (referenced from deploy/eigencompute.app.yaml -> sandbox.policy)
+# -----------------------------------------------------------------------------
+
+apiVersion: nemoclaw.nvidia.com/v1
+kind: SandboxPolicy
+metadata:
+  name: lighterclaw-agent-runtime
+  labels:
+    app: lighterclaw
+    plane: execution
+
+spec:
+  # ---------------------------------------------------------------------------
+  # Managed inference / model egress: DISABLED.
+  # This is a deterministic trading agent, not an LLM agent. There is no reason
+  # for it to call a model endpoint, and allowing one would be an exfil channel.
+  # ---------------------------------------------------------------------------
+  inference:
+    enabled: false
+    denyModelEgress: true        # block NemoClaw's managed-inference egress path
+
+  # ---------------------------------------------------------------------------
+  # NETWORK: default deny. Only the two hosts below may be reached, on 443 only.
+  # ---------------------------------------------------------------------------
+  network:
+    defaultEgress: deny          # deny-all; nothing leaves unless listed below
+    defaultIngress: deny         # no inbound except the health port (see ports)
+    dns:
+      # DNS is itself restricted to resolving only the allowlisted names, via
+      # the sandbox resolver. No arbitrary lookups (prevents DNS-tunnel exfil).
+      mode: allowlist
+      allowedNames:
+        - mainnet.zklighter.elliot.ai
+        - testnet.zklighter.elliot.ai
+        - ${RPC_HOST}            # injected from RPC_URL host at deploy time
+
+    egress:
+      allow:
+        # --- (a) Lighter API host(s) -----------------------------------------
+        # The SDK's LighterClient talks to mainnet.zklighter.elliot.ai (or the
+        # testnet host when USE_TESTNET=1). Same host serves /api/v1/account,
+        # /orderBookDetails, /funding-rates, order placement, and the SignerClient.
+        - name: lighter-mainnet
+          host: mainnet.zklighter.elliot.ai
+          ports: [443]
+          protocol: tcp
+        - name: lighter-testnet
+          host: testnet.zklighter.elliot.ai
+          ports: [443]
+          protocol: tcp
+
+        # --- (b) L2 RPC endpoint ---------------------------------------------
+        # web3 (VaultClient) uses RPC_URL for attestation bind + accrueTxFee +
+        # bridge calls. Host is parameterized: deploy.sh extracts it from
+        # RPC_URL and substitutes ${RPC_HOST}. Pin to the exact host, 443 only.
+        - name: l2-rpc
+          host: ${RPC_HOST}
+          ports: [443]
+          protocol: tcp
+
+      # Explicit deny notes (documentation; defaultEgress: deny already blocks
+      # these — listed so the threat model is legible to a reviewer):
+      deny:
+        - name: cloud-metadata          # 169.254.169.254 — KMS/credential theft vector
+          cidr: 169.254.169.254/32
+        - name: model-inference         # belt-and-suspenders with inference.enabled:false
+          host: "*"
+          tags: [inference, model]
+        - name: package-mirrors         # no pip/apt at runtime on a read-only rootfs
+          host: "*"
+          tags: [pypi, apt, npm]
+
+    # Inbound: only the healthcheck port, and only from the sandbox host's
+    # probe (EigenCompute / NemoClaw supervisor), not the public internet.
+    ports:
+      - name: healthcheck
+        containerPort: 8080            # matches $PORT / EXPOSE / app.yaml
+        protocol: tcp
+        ingress: host-only             # probe-only; no external exposure
+
+  # ---------------------------------------------------------------------------
+  # FILESYSTEM: read-only rootfs; one small writable scratch; secret read-only.
+  # ---------------------------------------------------------------------------
+  filesystem:
+    rootfs:
+      readOnly: true                   # immutable image; nothing writes to /app
+    mounts:
+      # Small writable scratch for tmp / Python runtime needs. Sized + noexec so
+      # a compromised strategy can't stage and run a downloaded binary here.
+      - path: /tmp
+        type: tmpfs
+        readOnly: false
+        sizeLimit: 64Mi
+        options: [noexec, nosuid, nodev]
+
+      # KMS-injected mnemonic, mounted READ-ONLY. EigenCompute KMS writes the
+      # secret here; the SDK reads MNEMONIC / TEE_PRIVATE_KEY from it. Read-only
+      # so the process cannot rewrite/relocate it, and (with egress denied) it
+      # cannot leave the sandbox.
+      - path: /run/secrets/kms
+        type: secret
+        source: kms-mnemonic           # see deploy/eigencompute.app.yaml kms:
+        readOnly: true
+        mode: "0400"
+
+      # Attestation token EigenCompute drops for the runtime to POST to the
+      # AttestationRegistry on boot (ATTESTATION_TOKEN_PATH points here).
+      - path: /run/attestation
+        type: attestation
+        readOnly: true
+
+    # Everything else is denied: no /proc writes, no /sys, no host mounts.
+    denyPaths:
+      - /proc/sys
+      - /sys
+      - /host
+
+  # ---------------------------------------------------------------------------
+  # PROCESS / SYSCALL hardening.
+  # ---------------------------------------------------------------------------
+  process:
+    user: "10001"                      # non-root (matches Dockerfile USER)
+    noNewPrivileges: true              # block setuid escalation
+    readOnlyExec: true                 # code pages immutable
+    capabilities:
+      drop: ["ALL"]                    # drop every Linux capability
+      add: []                          # add none
+    seccomp:
+      # Default-deny syscall profile. NemoClaw's baseline for a network client +
+      # asyncio is sufficient; we explicitly block the dangerous families below
+      # on top of the default profile.
+      profile: runtime/default
+      denySyscalls:
+        - ptrace                       # no debugger attach / process injection
+        - mount
+        - umount2
+        - pivot_root
+        - kexec_load
+        - bpf
+        - perf_event_open
+        - process_vm_readv             # no cross-process memory scrape
+        - process_vm_writev
+    rlimits:
+      nofile: 1024
+      nproc: 64
+
+  # ---------------------------------------------------------------------------
+  # Env contract the sandbox forwards to the agent (values come from
+  # EigenCompute KMS / app.yaml, NOT baked into the image). Listed so the
+  # sandbox can scrub any env not on this allowlist before exec.
+  # ---------------------------------------------------------------------------
+  env:
+    allow:
+      - MNEMONIC                       # KMS-injected; the TEE wallet seed
+      - TEE_PRIVATE_KEY               # KMS-injected; signs vault txs
+      - IMAGE_HASH                     # attested digest (this image)
+      - ATTESTATION_TOKEN_PATH         # -> /run/attestation/token
+      - VAULT_ADDRESS
+      - RPC_URL
+      - ATTESTATION_REGISTRY
+      - LIGHTER_API_KEY               # pre-registered API key private key
+      - LIGHTER_ACCOUNT_INDEX
+      - LIGHTER_SUBACCOUNT_INDEX
+      - USE_TESTNET
+      - STRATEGY_MODULE
+      - PORT
+      - LIVENESS_TIMEOUT_S
+      - LOG_LEVEL
+      # Guardrail caps (vault's published risk limits, enforced in-TEE):
+      - GUARD_ALLOWED_MARKETS
+      - GUARD_MAX_LEVERAGE
+      - GUARD_MAX_GROSS_NOTIONAL
+      - GUARD_MAX_NOTIONAL_PER_ORDER
+      - GUARD_MAX_NOTIONAL_PER_MARKET
+      - GUARD_MIN_FREE_COLLATERAL
+      - GUARD_MAX_ORDERS_PER_TICK
+      - GUARD_MAX_DRAWDOWN_PCT
+      - GUARD_FLATTEN_ON_HALT
+    scrubUnlisted: true                # drop any env not listed above

@@ -1,0 +1,122 @@
+# =============================================================================
+# EigenCompute app manifest for the LighterClaw agent-runtime.
+# Consumed by:  ecloud compute app deploy -f deploy/eigencompute.app.yaml
+#
+# This declares the NemoClaw-sandboxed trading agent: the image to attest, the
+# healthcheck port, the KMS mnemonic injection, the env contract, and a pointer
+# to the OpenShell sandbox policy. ${VARS} are substituted by deploy.sh from
+# deploy/.env (envsubst) before the manifest is handed to ecloud.
+# =============================================================================
+
+apiVersion: eigencompute/v1
+kind: App
+metadata:
+  # Logical app name; re-deploying the same name updates in place (idempotent).
+  name: ${ECLOUD_APP_NAME}
+  labels:
+    app: lighterclaw
+    plane: execution
+    strategy: ${STRATEGY_MODULE}
+
+spec:
+  # ---------------------------------------------------------------------------
+  # Image: the attested artifact. EigenCompute pins this digest and the returned
+  # IMAGE_HASH is what VaultFactory.createVault binds on-chain. amd64 TEE.
+  # ---------------------------------------------------------------------------
+  image:
+    ref: ${IMAGE_REF}:${IMAGE_TAG}
+    platform: linux/amd64
+    pullPolicy: Always
+
+  # ---------------------------------------------------------------------------
+  # Runtime = NemoClaw OpenShell sandbox. EigenCompute launches the image under
+  # NemoClaw using the policy below (deny-all egress except Lighter + RPC, RO
+  # rootfs, dropped caps). This is what makes the execution plane verifiable.
+  # ---------------------------------------------------------------------------
+  runtime:
+    sandbox: nemoclaw
+    policy: ${NEMOCLAW_POLICY}        # agent-runtime/nemoclaw.policy.yaml
+    inference:
+      enabled: false                  # deterministic agent: no managed model egress
+
+  # ---------------------------------------------------------------------------
+  # Healthcheck: EigenCompute probes /healthz on the container port; NemoClaw
+  # exposes it host-only (see policy ports). Matches Dockerfile EXPOSE + $PORT.
+  # ---------------------------------------------------------------------------
+  healthcheck:
+    port: ${HEALTHCHECK_PORT}
+    path: /healthz
+    protocol: http
+    initialDelaySeconds: 60           # boot binds attestation + Lighter API key
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  # ---------------------------------------------------------------------------
+  # KMS: EigenCompute derives the TEE wallet from the attested image and injects
+  # the mnemonic as a read-only secret. The NemoClaw policy mounts it at
+  # /run/secrets/kms (read-only). The SDK reads MNEMONIC / TEE_PRIVATE_KEY.
+  # `derivation: image-bound` => teeWallet = f(imageHash), the property the
+  # vault contract relies on.
+  # ---------------------------------------------------------------------------
+  kms:
+    - name: kms-mnemonic
+      kind: mnemonic
+      derivation: image-bound         # wallet bound to this image's attestation
+      mountPath: /run/secrets/kms
+      # The platform exposes the injected values to the process as these env vars
+      # (names match the SDK's os.environ lookups exactly).
+      env:
+        mnemonic: MNEMONIC
+        privateKey: TEE_PRIVATE_KEY
+
+  # ---------------------------------------------------------------------------
+  # Attestation: EigenCompute drops the attestation token for the runtime to
+  # POST to AttestationRegistry.bind on boot. ATTESTATION_TOKEN_PATH points the
+  # SDK at it; IMAGE_HASH is injected post-attestation.
+  # ---------------------------------------------------------------------------
+  attestation:
+    mountPath: /run/attestation
+    env:
+      tokenPath: ATTESTATION_TOKEN_PATH   # -> /run/attestation/token
+      imageHash: IMAGE_HASH
+
+  # ---------------------------------------------------------------------------
+  # Env contract forwarded to the agent. KMS/attestation vars above are injected
+  # by the platform; these are the deploy-time configuration values. They map
+  # 1:1 to the SDK's os.environ lookups and the Guardrails.from_env caps.
+  # VAULT_ADDRESS is patched in AFTER createVault (the agent needs the vault it
+  # trades for); deploy.sh updates the app with it (ecloud compute app set-env).
+  # ---------------------------------------------------------------------------
+  env:
+    # chain / vault
+    RPC_URL: ${RPC_URL}
+    ATTESTATION_REGISTRY: ${ATTESTATION_REGISTRY}
+    VAULT_ADDRESS: ${VAULT_ADDRESS}        # set post-createVault
+    # lighter
+    LIGHTER_ACCOUNT_INDEX: "${LIGHTER_ACCOUNT_INDEX}"
+    LIGHTER_SUBACCOUNT_INDEX: "${LIGHTER_SUBACCOUNT_INDEX}"
+    USE_TESTNET: "${USE_TESTNET}"
+    # LIGHTER_API_KEY is a secret (the API-key private key); inject via secret
+    # store, NOT here. Referenced as a secret below.
+    # strategy / runtime
+    STRATEGY_MODULE: ${STRATEGY_MODULE}
+    PORT: "${HEALTHCHECK_PORT}"
+    LOG_LEVEL: INFO
+    # guardrail caps (vault's published risk limits, enforced in-TEE)
+    GUARD_ALLOWED_MARKETS: ${GUARD_ALLOWED_MARKETS}
+    GUARD_MAX_LEVERAGE: "${GUARD_MAX_LEVERAGE}"
+    GUARD_MAX_NOTIONAL_PER_ORDER: "${GUARD_MAX_NOTIONAL_PER_ORDER}"
+    GUARD_MAX_NOTIONAL_PER_MARKET: "${GUARD_MAX_NOTIONAL_PER_MARKET}"
+    GUARD_MIN_FREE_COLLATERAL: "${GUARD_MIN_FREE_COLLATERAL}"
+    GUARD_MAX_DRAWDOWN_PCT: "${GUARD_MAX_DRAWDOWN_PCT}"
+
+  # ---------------------------------------------------------------------------
+  # Secrets: the Lighter API-key private key the builder pre-registered for the
+  # TEE wallet. Stored in EigenCompute's secret store and surfaced to the
+  # process as $LIGHTER_API_KEY (LighterClient.from_env reads it). Never logged.
+  # ---------------------------------------------------------------------------
+  secrets:
+    - name: lighter-api-key
+      env: LIGHTER_API_KEY
+      # Provide via:  ecloud compute secret set lighter-api-key --from-file=...

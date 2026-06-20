@@ -1,0 +1,6 @@
+# Never commit the real env (holds the builder PRIVATE_KEY).
+.env
+# Deploy artifacts emitted by deploy.sh.
+deploy.out.json
+.rendered.app.yaml
+*.log

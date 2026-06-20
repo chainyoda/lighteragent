@@ -1,0 +1,14 @@
+# Runtime image deps. The agent SDK pins lighter-v2-python, web3, eth-account,
+# httpx and pydantic transitively (see agent-sdk/pyproject.toml), so the only
+# thing we install here is the local SDK itself. The healthcheck + entrypoint
+# are pure stdlib on purpose, to keep the NemoClaw syscall/fs allowlist tight.
+#
+# Installed from the local checkout in the Dockerfile via `pip install ./agent-sdk`
+# (build context = repo root). This file exists so the image is reproducible and
+# so `pip install -r requirements.txt` works in a plain dev venv when the SDK is
+# already on the path; the canonical install is the Dockerfile's `pip install
+# ./agent-sdk`.
+#
+# If you prefer to pin from the local path here instead of in the Dockerfile,
+# uncomment (requires build context = repo root):
+# ./agent-sdk
