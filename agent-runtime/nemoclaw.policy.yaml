@@ -187,6 +187,12 @@ spec:
       - PORT
       - LIVENESS_TIMEOUT_S
       - LOG_LEVEL
+      # NemoClaw Shell path (SHELL_MODE, default on). SKILL_REGISTRY is the only
+      # new on-chain dependency; it is read over the already-allowlisted RPC host.
+      - SHELL_MODE
+      - SKILL_REGISTRY
+      - AGENT_MODULE
+      - HEARTBEAT_EVERY_TICKS
       # Guardrail caps (vault's published risk limits, enforced in-TEE):
       - GUARD_ALLOWED_MARKETS
       - GUARD_MAX_LEVERAGE

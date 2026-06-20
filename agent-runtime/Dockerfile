@@ -35,6 +35,9 @@ COPY agent-runtime/entrypoint.py     /app/entrypoint.py
 COPY agent-runtime/healthcheck.py    /app/healthcheck.py
 COPY agent-runtime/funding_carry.py  /app/funding_carry.py
 COPY agent-runtime/requirements.txt  /app/requirements.txt
+# NemoClaw Shell package (Shell-wraps-Agent execution plane). Selected by
+# SHELL_MODE (default on); the legacy funding_carry path above still works.
+COPY agent-runtime/shell/            /app/shell/
 
 # Run as a non-root, unprivileged user. NemoClaw drops all caps regardless, but
 # defense-in-depth: the container itself shouldn't run as root. UID 10001 owns
