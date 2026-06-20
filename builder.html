@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>My agents — EigenStrategies</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Syne:wght@500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --background: 0.928 0.016 106; --foreground: 0.255 0.012 122;
+    --card: 0.976 0.009 106; --well: 0.902 0.018 104;
+    --muted-foreground: 0.485 0.008 286; --primary: 0.475 0.095 158;
+    --primary-foreground: 0.985 0.008 106; --accent: 0.75 0.185 45;
+    --border: 0.853 0.013 104; --destructive: 0.53 0.19 28; --radius: 0.75rem;
+  }
+  html, body { background: oklch(var(--background)); color: oklch(var(--foreground)); font-family: "Geist", system-ui, sans-serif; }
+  .display { font-family: "Syne", "Geist", sans-serif; letter-spacing: -0.02em; }
+  .mono { font-family: "Geist Mono", ui-monospace, monospace; }
+  .surface { background: oklch(var(--card)); border: 1px solid oklch(var(--border)); }
+  .well { background: oklch(var(--well)); }
+  .btn-primary { background: oklch(var(--primary)); color: oklch(var(--primary-foreground)); }
+  .btn-primary:hover { background: oklch(0.42 0.095 158); }
+  .text-primary { color: oklch(var(--primary)); }
+  .text-accent { color: oklch(var(--accent)); }
+  .text-muted { color: oklch(var(--muted-foreground)); }
+  .text-destructive { color: oklch(var(--destructive)); }
+  .border-default { border-color: oklch(var(--border)); }
+  .icon-tile-primary { background: oklch(var(--primary) / 0.1); color: oklch(var(--primary)); }
+  .icon-tile-accent { background: oklch(var(--accent) / 0.12); color: oklch(var(--accent)); }
+  .badge { display:inline-flex; align-items:center; gap:0.25rem; font-family:"Geist Mono",monospace; font-size:0.6875rem; padding:0.125rem 0.5rem; border-radius:9999px; border:1px solid oklch(var(--border)); background:oklch(var(--card)); text-transform:uppercase; letter-spacing:0.05em; }
+  .badge-attested { color: oklch(var(--primary)); border-color: oklch(var(--primary) / 0.3); background: oklch(var(--primary) / 0.08); }
+  .badge-pending { color: oklch(var(--accent)); border-color: oklch(var(--accent) / 0.3); background: oklch(var(--accent) / 0.1); }
+  .row-hover:hover { background: oklch(var(--well) / 0.5); }
+  .btn-ghost { border:1px solid oklch(var(--border)); border-radius:0.375rem; padding:0.35rem 0.7rem; font-size:0.75rem; }
+  .btn-ghost:hover { border-color: oklch(var(--foreground)); }
+  .modal-backdrop { position:fixed; inset:0; z-index:90; background:oklch(0.2 0 0 / 0.45); display:flex; align-items:center; justify-content:center; padding:1rem; }
+  .field { width:100%; border:1px solid oklch(var(--border)); border-radius:0.5rem; padding:0.55rem 0.75rem; outline:none; background:oklch(var(--card)); font-size:0.85rem; }
+  .field:focus { border-color: oklch(var(--foreground)); }
+</style>
+</head>
+<body class="min-h-screen">
+
+<header class="border-b border-default">
+  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="./index.html" class="flex items-center gap-2.5">
+      <svg width="26" height="26" viewBox="0 0 32 32">
+        <path d="M16 2 L29 9 V23 L16 30 L3 23 V9 Z" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <path d="M16 8 L24 12 V20 L16 24 L8 20 V12 Z" fill="currentColor" opacity="0.15" />
+        <circle cx="16" cy="16" r="2.5" fill="currentColor" />
+      </svg>
+      <span class="display text-lg font-semibold">EigenStrategies</span>
+    </a>
+    <nav class="flex items-center gap-1 text-sm">
+      <a href="./index.html" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:oklch(var(--foreground))]">Discover</a>
+      <a href="./portfolio.html" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:oklch(var(--foreground))]">Portfolio</a>
+      <a href="./builder.html" class="px-3 py-1.5 rounded-md font-medium">My agents</a>
+      <a href="./create.html" class="px-3 py-1.5 rounded-md text-muted hover:text-[color:oklch(var(--foreground))]">Build your own agent</a>
+    </nav>
+    <button data-wallet-btn class="text-sm px-3.5 py-1.5 rounded-md border border-default hover:border-[color:oklch(var(--foreground))] mono">Connect wallet</button>
+  </div>
+</header>
+
+<div class="max-w-6xl mx-auto px-6 py-10">
+  <div class="flex items-end justify-between gap-4 mb-8 flex-wrap">
+    <div>
+      <div class="mono text-xs uppercase tracking-[0.18em] text-muted mb-2">Builder studio</div>
+      <h1 class="display text-4xl font-semibold">My agents</h1>
+      <p class="text-muted mt-2 max-w-xl text-sm">Every vault you've deployed — AUM, investors, fees you've earned, and the attested image each one is running. Rotate a strategy image to open an investor redemption window.</p>
+    </div>
+    <a href="./create.html" class="btn-primary px-5 py-2.5 rounded-md text-sm font-medium whitespace-nowrap">+ Deploy new agent</a>
+  </div>
+
+  <!-- Empty / not-connected -->
+  <div id="empty" class="surface rounded-xl p-12 text-center hidden">
+    <div class="display text-2xl font-semibold mb-2">You haven't deployed an agent yet</div>
+    <p class="text-muted mb-6 max-w-md mx-auto">Write a strategy in plain English, backtest it, and deploy it to a TEE. The agents you create show up here so you can manage them and track the fees they earn.</p>
+    <div class="flex gap-3 justify-center flex-wrap">
+      <a href="./create.html" class="btn-primary px-6 py-3 rounded-md text-sm font-medium">Build your first agent →</a>
+      <button id="connect-cta" class="px-6 py-3 rounded-md border border-default hover:border-[color:oklch(var(--foreground))] text-sm font-medium mono">Connect wallet</button>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dash" class="hidden space-y-6">
+    <!-- builder identity -->
+    <div class="surface rounded-xl p-5 flex items-center justify-between gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div id="b-tile" class="h-11 w-11 rounded-lg icon-tile-primary flex items-center justify-center display text-xl font-semibold">B</div>
+        <div>
+          <div id="b-name" class="font-medium flex items-center gap-2">—</div>
+          <div id="b-sub" class="mono text-xs text-muted mt-0.5">—</div>
+        </div>
+      </div>
+      <div id="b-connect-hint" class="text-xs text-muted mono hidden">Read-only · connect a wallet to sign rotations</div>
+    </div>
+
+    <!-- summary stats -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div class="surface rounded-xl p-5"><div class="mono text-xs uppercase tracking-wider text-muted">Agents</div><div id="s-count" class="display text-2xl font-semibold mt-1">—</div></div>
+      <div class="surface rounded-xl p-5"><div class="mono text-xs uppercase tracking-wider text-muted">Total AUM</div><div id="s-aum" class="display text-2xl font-semibold mt-1">—</div></div>
+      <div class="surface rounded-xl p-5"><div class="mono text-xs uppercase tracking-wider text-muted">Investors</div><div id="s-inv" class="display text-2xl font-semibold mt-1">—</div></div>
+      <div class="surface rounded-xl p-5"><div class="mono text-xs uppercase tracking-wider text-muted">Fees earned</div><div id="s-fees" class="display text-2xl font-semibold mt-1 text-primary">—</div></div>
+      <div class="surface rounded-xl p-5"><div class="mono text-xs uppercase tracking-wider text-muted">Avg APR</div><div id="s-apr" class="display text-2xl font-semibold mt-1">—</div></div>
+    </div>
+
+    <!-- agents table -->
+    <div class="surface rounded-xl overflow-x-auto">
+      <table class="w-full text-sm min-w-[820px]">
+        <thead class="well border-b border-default"><tr class="mono text-[0.7rem] uppercase tracking-[0.12em] text-muted">
+          <th class="text-left px-5 py-3 font-medium">Agent</th>
+          <th class="text-left px-5 py-3 font-medium">30d</th>
+          <th class="text-right px-5 py-3 font-medium">AUM</th>
+          <th class="text-right px-5 py-3 font-medium">Investors</th>
+          <th class="text-right px-5 py-3 font-medium">APR</th>
+          <th class="text-right px-5 py-3 font-medium">Fees earned</th>
+          <th class="text-left px-5 py-3 font-medium">Image</th>
+          <th class="text-right px-5 py-3 font-medium"></th>
+        </tr></thead>
+        <tbody id="a-rows" style="background:oklch(var(--card))"></tbody>
+      </table>
+    </div>
+    <p class="text-xs text-muted mono">Fees = performance share of profit on outside capital + per-trade fee on traded notional. Hover a fee for the split.</p>
+  </div>
+</div>
+
+<!-- rotation modal -->
+<div id="rotate-modal" class="modal-backdrop hidden">
+  <div class="surface rounded-xl p-6 w-full max-w-md" style="box-shadow:0 24px 60px oklch(0.2 0 0 / 0.25)">
+    <div class="flex items-start justify-between gap-4 mb-1">
+      <div>
+        <div class="mono text-xs uppercase tracking-wider text-accent mb-1">Rotate strategy image</div>
+        <div id="rm-name" class="display text-lg font-semibold">—</div>
+      </div>
+      <button id="rm-close" class="text-muted hover:text-[color:oklch(var(--foreground))] text-xl leading-none">&times;</button>
+    </div>
+    <p class="text-sm text-muted mb-4">Proposing a new attested image opens a <b>24-hour redemption window</b>. Existing investors can redeem at the last high-water mark before the new image takes authority. The current image keeps trading until you accept.</p>
+    <label class="block text-xs mono uppercase tracking-wider text-muted mb-1">Current image</label>
+    <div id="rm-current" class="mono text-xs well rounded-md px-3 py-2 mb-4 text-muted">—</div>
+    <label class="block text-xs mono uppercase tracking-wider text-muted mb-1">New image hash</label>
+    <input id="rm-hash" class="field mono mb-3" placeholder="0x…" spellcheck="false" />
+    <label class="block text-xs mono uppercase tracking-wider text-muted mb-1">Change note <span class="normal-case tracking-normal">(shown to investors)</span></label>
+    <textarea id="rm-note" rows="2" class="field mb-4" placeholder="e.g. Tighter stop-loss; reduced max leverage"></textarea>
+    <div class="flex gap-3">
+      <button id="rm-submit" class="btn-primary flex-1 px-5 py-2.5 rounded-md text-sm font-medium">Propose rotation</button>
+      <button id="rm-cancel" class="px-5 py-2.5 rounded-md border border-default hover:border-[color:oklch(var(--foreground))] text-sm font-medium">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<footer class="border-t border-default mt-16">
+  <div class="max-w-6xl mx-auto px-6 py-8 text-xs text-muted flex justify-between mono uppercase tracking-wider">
+    <div>EigenStrategies · prototype · testnet — simulated data</div>
+    <a href="https://github.com/chainyoda/lighteragent" class="hover:text-[color:oklch(var(--foreground))]">GitHub →</a>
+  </div>
+</footer>
+
+<script src="./data.js?v=10" defer></script>
+<script src="./ui.js?v=10" defer></script>
+<script src="./builder.js?v=10" defer></script>
+<script src="./wallet.js?v=10" defer></script>
+</body>
+</html>
