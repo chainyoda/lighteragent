@@ -320,8 +320,9 @@ contract EigenVault is IEigenVault, ERC4626, ReentrancyGuard {
         if (pending.active) revert PendingImageExists();
 
         uint256 acceptableAt = block.timestamp + rotationWindow;
-        pending =
-            PendingImage({newHash: newHash, newWallet: newWallet, acceptableAt: acceptableAt, active: true});
+        pending = PendingImage({
+            newHash: newHash, newWallet: newWallet, acceptableAt: acceptableAt, active: true
+        });
         emit ImageProposed(newHash, newWallet, acceptableAt);
     }
 

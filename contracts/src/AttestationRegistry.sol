@@ -2,9 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {
-    IAttestationRegistry, IAttestationVerifier
-} from "../interfaces/IAttestationRegistry.sol";
+import {IAttestationRegistry, IAttestationVerifier} from "../interfaces/IAttestationRegistry.sol";
 
 /// @title AttestationRegistry
 /// @notice Onchain pin of `(vault -> imageHash, teeWallet)` for EigenStrategies.

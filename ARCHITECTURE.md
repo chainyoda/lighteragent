@@ -13,8 +13,8 @@ below is in service of that.
 
 ## Trust model
 
-Two independent mechanisms, layered (defense-in-depth) — neither is trusted
-alone:
+Two layers, composed (defense-in-depth) — the onchain **custody gate** and the
+measured **execution shell** — neither trusted alone:
 
 ### 1. TEE attestation → `teeWallet` gating (onchain, load-bearing)
 
@@ -32,17 +32,60 @@ alone:
   opens a redemption window before `acceptImage` swaps `(imageHash, teeWallet)`.
   Investors get an exit before the new code can trade. (README §2 invariants.)
 
-### 2. NemoClaw egress allowlist (in-TEE, defense-in-depth)
+### 2. The NemoClaw Shell: a measured boundary around a *mutable* agent
 
-The contract gate bounds *where funds can go*. NemoClaw bounds *what the
-container can reach*: the agent image is wrapped in a NemoClaw sandbox with a
-network **egress allowlist** (RPC, Lighter API, EigenCompute KMS — nothing
-else). So even a malicious or compromised strategy inside the attested image
-cannot exfiltrate the KMS-injected mnemonic or phone home to an arbitrary host.
+The contract gate bounds *where funds can go*. The NemoClaw Shell bounds *what
+the agent can do*. This is the load-bearing idea of the whole design, and it is
+**nested**:
 
-The two compose: attestation guarantees *which* code holds the key and binds
-fund-movement to it; NemoClaw constrains that code's blast radius. Lose one and
-the other still holds the core invariant.
+```
+┌─ EigenCompute instance (one per vault, attested) ───────────────┐
+│  ┌─ NemoClaw Shell (open-source, MEASURED, on-chain bound) ───┐  │
+│  │   • Policy engine        (asset / leverage / concentration)│  │
+│  │   • Lighter order gateway (the ONLY path to the exchange)  │  │
+│  │   • Skill loader + skill-hash registry check               │  │
+│  │   • Attestation producer  (per-order + heartbeat)          │  │
+│  │   • Vault accounting      (deposits / shares / fees / HWM)  │  │
+│  │   ┌─ Agent (deployer-owned, SECRET, MUTABLE) ───────────┐  │  │
+│  │   │   • Thematic mandate prompt                         │  │  │
+│  │   │   • Skills: research / analysis / sizing / exec     │  │  │
+│  │   │   • Models, MCP servers, data sources               │  │  │
+│  │   │   • Hermes-style runtime skill updates              │  │  │
+│  │   └─────────────────────────────────────────────────────┘  │  │
+│  └────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
+                              │ orders
+                              ▼
+                       Lighter exchange
+```
+
+What's attested and pinned on-chain (`imageHash`, via `AttestationRegistry`) is
+the **Shell** — the open, measured enforcement layer — *not* the agent. The
+agent inside is the builder's edge: private, and free to mutate (swap models,
+add MCP tools, hot-update skills Hermes-style). That mutability is safe because
+the agent can only ever act *through* the shell:
+
+- **The agent proposes; the shell disposes.** The agent returns *intents*; it
+  has no handle to the Lighter client. Every intent passes the shell's **policy
+  engine** (the published guardrails — markets, leverage, concentration) and is
+  submitted only via the shell's **order gateway**, the sole egress to the
+  exchange (a NemoClaw OpenShell network allowlist denies every other host, so
+  the agent can't reach Lighter, the KMS, or anything else directly).
+- **Skills are hash-checked.** The shell's skill loader computes each skill's
+  hash and refuses (fail-closed) to run any skill not present in the on-chain
+  **`SkillRegistry`** for this vault. The builder registers a skill's hash
+  on-chain *before* the shell will load it. So investors see *that* the agent
+  changed (the skill hashes are public — a transparency log) without seeing the
+  secret skill *content*, and a silently-injected skill simply won't run.
+- **Attestation is continuous.** The shell produces a **per-order** attestation
+  (signed by `W`) and posts a periodic **heartbeat** on-chain
+  (`SkillRegistry.heartbeat(vault, ordersRoot, navRoot, attestation)`) — a
+  rolling commitment to the orders it placed and the NAV it reported.
+
+The three layers compose: attestation guarantees *which shell* holds the key;
+the shell's policy engine + sole gateway + skill-hash check constrain *what the
+agent can do with it*; and `teeWallet` gating constrains *where funds can go*.
+A mutated or malicious agent never escapes the measured shell.
 
 > Threats and mitigations are tabulated in [`README.md` → Threat Model](./README.md#threat-model-high-level).
 
@@ -54,8 +97,10 @@ Which directory implements which part of the README architecture:
 
 | Plane | Directory | Implements (README §) | Key files |
 |---|---|---|---|
-| **Custody** (onchain) | [`contracts/`](./contracts/) | §1 VaultFactory, §2 EigenVault, §3 AttestationRegistry, §4 FeeAccountant, §5 LighterAdapter | `src/VaultFactory.sol`, `src/EigenVault.sol`, `src/AttestationRegistry.sol`, `src/FeeAccountant.sol`, `src/adapters/LighterAdapter.sol`, `script/Deploy.s.sol` |
-| **Execution** (TEE) | [`agent-runtime/`](./agent-runtime/) | §5 (off-chain SDK side), §6 EigenCompute Image | `Dockerfile`, runtime boot/loop, attestation post |
+| **Custody** (onchain) | [`contracts/`](./contracts/) | §1 VaultFactory, §2 EigenVault, §3 AttestationRegistry, §4 FeeAccountant, §5 LighterAdapter | `src/VaultFactory.sol`, `src/EigenVault.sol`, `src/AttestationRegistry.sol`, `src/FeeAccountant.sol`, `src/adapters/LighterAdapter.sol`, `src/SkillRegistry.sol`, `script/Deploy.s.sol` |
+| **Skill / attestation anchor** | [`contracts/`](./contracts/) | on-chain skill-hash allowlist + heartbeat log | `src/SkillRegistry.sol` (`isAllowedSkill`, `heartbeat`) |
+| **Execution** — the Shell | [`agent-runtime/`](./agent-runtime/) | §5 (off-chain SDK side), §6 EigenCompute Image; the five shell responsibilities | `shell/shell.py` (run loop), `shell/order_gateway.py` (sole Lighter path), `shell/skill_loader.py` (hash check), `shell/attestation.py` (per-order + heartbeat), `Dockerfile` |
+| **Execution** — the Agent | [`agent-runtime/`](./agent-runtime/) | deployer-owned mutable agent (mandate + skills + models/MCP) | `shell/agent.py` (`Agent`, `Skill`, `ReferenceAgent`) |
 | **Execution** sandbox/ship | [`deploy/`](./deploy/) | §6 image deploy under NemoClaw | `deploy.sh` |
 | **Strategy authoring** | [`agent-sdk/`](./agent-sdk/) | the `Strategy.decide` interface + vault/Lighter clients | `eigenstrategies_sdk/vault_client.py` (the on-chain ABI surface the TEE calls), strategy base |
 | **Reference strategy** | [`agents/funding-carry/`](./agents/funding-carry/) | delta-neutral funding carry | `strategy.py`, `Dockerfile` |
